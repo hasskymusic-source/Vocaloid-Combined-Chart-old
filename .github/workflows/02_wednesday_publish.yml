@@ -1,9 +1,12 @@
 name: 02_Wednesday_Publish_Chart
 
 on:
-  schedule:
-    - cron: '0 4 * * 3'
   workflow_dispatch:
+    inputs:
+      force_publish:
+        description: '水曜13:00前でも強制的に即時公開する場合は true'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -16,24 +19,43 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
       - name: Promote draft to public & archive
         env:
           TZ: 'Asia/Tokyo'
-        run: python backend/publish_chart.py
+        run: |
+          if [ "${{ github.event.inputs.force_publish }}" = "true" ]; then
+            python backend/publish_chart.py --force
+          else
+            python backend/publish_chart.py
+          fi
+          python backend/export_blog.py
 
       - name: Commit published JSON to repository
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/data/
-          git diff --staged --quiet || git commit -m "feat(chart): publish weekly chart"
-          git push
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "変更はありません。"
+          else
+            git commit -m "feat(chart): publish weekly chart"
+            git push origin main
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -42,3 +64,26 @@ jobs:
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+
+      - name: Post update to X (Twitter)
+        env:
+          TZ: 'Asia/Tokyo'
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          python backend/post_to_x.py
+
+      - name: Commit X post history
+        run: |
+          if [ -f data/x_post_history.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/x_post_history.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore(x): record X post history"
+              git pull --rebase origin main || true
+              git push origin main
+            fi
+          fi
