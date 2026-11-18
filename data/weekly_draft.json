@@ -3,7 +3,7 @@
   "publishAt": "2026-11-18T13:00:00+09:00",
   "archiveId": "2026-11-18",
   "period": "2026/11/09 - 2026/11/15",
-  "updated_at": "2026-11-16 00:47",
+  "updated_at": "2026-11-19 07:54",
   "weeklySummary": "集計期間（2026-10-05 〜 2026-10-11）の週間VOCALOID複合ランキングTOP 20（初回公開）。日本国内のボカロ新譜から韓国・英語圏をはじめとするグローバルボカロPのヒット曲まで、YouTubeとニコニコ動画の6指標を横断集計した結果、ABM (AnythingBecomeMoe)『ヤラララ』が総合1位を獲得した。",
   "overall_commentary": "集計期間（2026-10-05 〜 2026-10-11）の週間VOCALOID複合ランキングTOP 20（初回公開）。日本国内のボカロ新譜から韓国・英語圏をはじめとするグローバルボカロPのヒット曲まで、YouTubeとニコニコ動画の6指標を横断集計した結果、ABM (AnythingBecomeMoe)『ヤラララ』が総合1位を獲得した。",
   "trend_analysis": "",
@@ -633,47 +633,6 @@
       "chart_in_count": 6
     },
     {
-      "id": "song_vjBFftpQxxM",
-      "song_id": "song_vjBFftpQxxM",
-      "title": "BUTCHER VANITY",
-      "producer": "Various artists",
-      "vocal": "Yi Xi",
-      "youtube_id": "vjBFftpQxxM",
-      "niconico_id": null,
-      "thumbnail": "https://i.ytimg.com/vi/vjBFftpQxxM/mqdefault.jpg",
-      "published_at": "2024-03-28T09:00:06+09:00",
-      "total_pt": 1023774,
-      "yt_total_pt": 1023774,
-      "nc_total_pt": 0,
-      "prevRank": 18,
-      "prev_rank": 18,
-      "prev_total_pt": 902267,
-      "pt_ratio": 113,
-      "raw": {
-        "yt_views": 759574,
-        "yt_likes": 4916,
-        "yt_comments": 184,
-        "nc_views": 0,
-        "nc_mylist": 0,
-        "nc_comments": 0,
-        "nc_mylists": 0
-      },
-      "pts": {
-        "yt_views": 759574,
-        "yt_likes": 245800,
-        "yt_comments": 18400,
-        "nc_views": 0,
-        "nc_mylist": 0,
-        "nc_mylists": 0,
-        "nc_comments": 0,
-        "yt_total": 1023774,
-        "nc_total": 0
-      },
-      "commentary": "",
-      "rank": 16,
-      "chart_in_count": 4
-    },
-    {
       "id": "song_sm45830241",
       "song_id": "song_sm45830241",
       "title": "次元通信",
@@ -711,7 +670,7 @@
         "nc_total": 9890
       },
       "commentary": "",
-      "rank": 17,
+      "rank": 16,
       "chart_in_count": 4
     },
     {
@@ -752,7 +711,7 @@
         "nc_total": 19035
       },
       "commentary": "YT: 95.4% / ニコ動: 4.6%の計948,426 ptを獲得し総合15位にランクイン。",
-      "rank": 18,
+      "rank": 17,
       "chart_in_count": 6
     },
     {
@@ -793,7 +752,7 @@
         "nc_total": 70480
       },
       "commentary": "",
-      "rank": 19,
+      "rank": 18,
       "chart_in_count": 4
     },
     {
@@ -834,8 +793,49 @@
         "nc_total": 87670
       },
       "commentary": "YT: 86.2% / ニコ動: 13.8%の計1,302,021 ptを獲得し総合9位にランクイン。",
-      "rank": 20,
+      "rank": 19,
       "chart_in_count": 6
+    },
+    {
+      "id": "song_sm47002303",
+      "song_id": "song_sm47002303",
+      "title": "ミラーミラー",
+      "producer": "탁",
+      "vocal": "初音ミク・重音テト",
+      "youtube_id": "0YHJoexs5TU",
+      "niconico_id": "sm47002303",
+      "thumbnail": "https://i.ytimg.com/vi/0YHJoexs5TU/mqdefault.jpg",
+      "published_at": "2026-11-03T09:00:00+09:00",
+      "total_pt": 741768,
+      "yt_total_pt": 703178,
+      "nc_total_pt": 38590,
+      "prevRank": 4,
+      "prev_rank": 4,
+      "prev_total_pt": 2789445,
+      "pt_ratio": 27,
+      "raw": {
+        "yt_views": 348528,
+        "yt_likes": 6835,
+        "yt_comments": 129,
+        "nc_views": 6800,
+        "nc_mylist": 45,
+        "nc_comments": 9,
+        "nc_mylists": 45
+      },
+      "pts": {
+        "yt_views": 348528,
+        "yt_likes": 341750,
+        "yt_comments": 12900,
+        "nc_views": 34000,
+        "nc_mylist": 4500,
+        "nc_mylists": 4500,
+        "nc_comments": 90,
+        "yt_total": 703178,
+        "nc_total": 38590
+      },
+      "commentary": "",
+      "rank": 20,
+      "chart_in_count": 2
     }
   ],
   "ranking": [
@@ -1455,47 +1455,6 @@
       "chart_in_count": 6
     },
     {
-      "id": "song_vjBFftpQxxM",
-      "song_id": "song_vjBFftpQxxM",
-      "title": "BUTCHER VANITY",
-      "producer": "Various artists",
-      "vocal": "Yi Xi",
-      "youtube_id": "vjBFftpQxxM",
-      "niconico_id": null,
-      "thumbnail": "https://i.ytimg.com/vi/vjBFftpQxxM/mqdefault.jpg",
-      "published_at": "2024-03-28T09:00:06+09:00",
-      "total_pt": 1023774,
-      "yt_total_pt": 1023774,
-      "nc_total_pt": 0,
-      "prevRank": 18,
-      "prev_rank": 18,
-      "prev_total_pt": 902267,
-      "pt_ratio": 113,
-      "raw": {
-        "yt_views": 759574,
-        "yt_likes": 4916,
-        "yt_comments": 184,
-        "nc_views": 0,
-        "nc_mylist": 0,
-        "nc_comments": 0,
-        "nc_mylists": 0
-      },
-      "pts": {
-        "yt_views": 759574,
-        "yt_likes": 245800,
-        "yt_comments": 18400,
-        "nc_views": 0,
-        "nc_mylist": 0,
-        "nc_mylists": 0,
-        "nc_comments": 0,
-        "yt_total": 1023774,
-        "nc_total": 0
-      },
-      "commentary": "",
-      "rank": 16,
-      "chart_in_count": 4
-    },
-    {
       "id": "song_sm45830241",
       "song_id": "song_sm45830241",
       "title": "次元通信",
@@ -1533,7 +1492,7 @@
         "nc_total": 9890
       },
       "commentary": "",
-      "rank": 17,
+      "rank": 16,
       "chart_in_count": 4
     },
     {
@@ -1574,7 +1533,7 @@
         "nc_total": 19035
       },
       "commentary": "YT: 95.4% / ニコ動: 4.6%の計948,426 ptを獲得し総合15位にランクイン。",
-      "rank": 18,
+      "rank": 17,
       "chart_in_count": 6
     },
     {
@@ -1615,7 +1574,7 @@
         "nc_total": 70480
       },
       "commentary": "",
-      "rank": 19,
+      "rank": 18,
       "chart_in_count": 4
     },
     {
@@ -1656,8 +1615,49 @@
         "nc_total": 87670
       },
       "commentary": "YT: 86.2% / ニコ動: 13.8%の計1,302,021 ptを獲得し総合9位にランクイン。",
-      "rank": 20,
+      "rank": 19,
       "chart_in_count": 6
+    },
+    {
+      "id": "song_sm47002303",
+      "song_id": "song_sm47002303",
+      "title": "ミラーミラー",
+      "producer": "탁",
+      "vocal": "初音ミク・重音テト",
+      "youtube_id": "0YHJoexs5TU",
+      "niconico_id": "sm47002303",
+      "thumbnail": "https://i.ytimg.com/vi/0YHJoexs5TU/mqdefault.jpg",
+      "published_at": "2026-11-03T09:00:00+09:00",
+      "total_pt": 741768,
+      "yt_total_pt": 703178,
+      "nc_total_pt": 38590,
+      "prevRank": 4,
+      "prev_rank": 4,
+      "prev_total_pt": 2789445,
+      "pt_ratio": 27,
+      "raw": {
+        "yt_views": 348528,
+        "yt_likes": 6835,
+        "yt_comments": 129,
+        "nc_views": 6800,
+        "nc_mylist": 45,
+        "nc_comments": 9,
+        "nc_mylists": 45
+      },
+      "pts": {
+        "yt_views": 348528,
+        "yt_likes": 341750,
+        "yt_comments": 12900,
+        "nc_views": 34000,
+        "nc_mylist": 4500,
+        "nc_mylists": 4500,
+        "nc_comments": 90,
+        "yt_total": 703178,
+        "nc_total": 38590
+      },
+      "commentary": "",
+      "rank": 20,
+      "chart_in_count": 2
     }
   ]
 }
