@@ -148,7 +148,7 @@ export async function ensureFullArchiveHistoryLoaded() {
     const cachedRaw = sessionStorage.getItem(ARCHIVE_HISTORY_SESSION_KEY);
     if (cachedRaw) {
       const parsed = JSON.parse(cachedRaw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.length >= state.cachedArchiveListMeta.length) {
         state.archiveHistoryCache = parsed;
         return;
       }
@@ -179,7 +179,7 @@ export async function ensureFullArchiveHistoryLoaded() {
 /** 過去アーカイブ履歴からチャートイン回数・前週ポイント・前週比を補完する */
 export function enrichWithHistory(chartData) {
   const songs = getSongsArray(chartData);
-  if (!songs.length || !state.archiveHistoryCache.length) return;
+  if (!songs.length) return;
 
   const getSortKey = function (c) {
     return c.archiveId || c.publishDate || c.period || c.updated_at || "";
