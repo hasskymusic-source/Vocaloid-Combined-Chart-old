@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import requests
 from datetime import datetime, timedelta, timezone
 from config import BASE_DIR, MASTER_FILE, PREV_SNAPSHOT, LATEST_SNAPSHOT
-from discover_songs import search_youtube_id_web_strict
+from discovery_sources import search_niconico_id_snapshot_strict, search_youtube_id_web_strict
 from vocaloid_filter import build_canonical_originals_map, clean_song_title, detect_vocals, is_eligible_ranking_song
 try:
     from googleapiclient.discovery import build
@@ -333,6 +333,25 @@ def main():
 
     if rescue_yt_ids:
         yt_map.update(fetch_youtube_stats_batch(rescue_yt_ids, api_key))
+
+    used_nc_ids = set(nc_ids)
+    rescue_nc_ids = []
+    for song in songs:
+        if len(rescue_nc_ids) >= 20:
+            break
+        yid = song.get("youtube_id", "")
+        nid = song.get("niconico_id", "")
+        yt_v = yt_map.get(yid, {}).get("yt_views", 0)
+        if (not nid or nid not in nc_map) and yt_v >= 50000 and is_eligible_ranking_song(song, canonical_map):
+            found_nid = search_niconico_id_snapshot_strict(song["title"], song["producer"], used_nc_ids)
+            if found_nid and found_nid not in used_nc_ids:
+                song["niconico_id"] = found_nid
+                used_nc_ids.add(found_nid)
+                rescue_nc_ids.append(found_nid)
+
+    if rescue_nc_ids:
+        nc_map.update(fetch_niconico_stats_hybrid(rescue_nc_ids))
+    if rescue_yt_ids or rescue_nc_ids:
         with open(MASTER_FILE, "w", encoding="utf-8") as f:
             json.dump(songs, f, ensure_ascii=False, indent=2)
 

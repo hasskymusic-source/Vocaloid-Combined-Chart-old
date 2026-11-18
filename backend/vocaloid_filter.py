@@ -1,93 +1,11 @@
 import re
-
-VOCAL_SYNONYMS = {
-    "初音ミク": ["初音ミク", "하츠네 미쿠", "hatsune miku", "miku"], "重音テト": ["重音テト", "重音テトsv", "카사네 테토", "kasane teto", "teto"],
-    "亞北ネル": ["亞北ネル", "亜北ネル", "akita neru", "아키타 네루"], "弱音ハク": ["弱音ハク", "yowane haku", "요와네 하쿠"],
-    "鏡音リン": ["鏡音リン", "카가미네 린", "kagamine rin"], "鏡音レン": ["鏡音レン", "카가미네 렌", "kagamine len"],
-    "巡音ルカ": ["巡音ルカ", "메구리네 루카", "megurine luka"], "MEIKO": ["meiko", "메이코", "メイコ"],
-    "KAITO": ["kaito", "카이토", "カイト"], "足立レイ": ["足立レイ", "아다치 레이", "adachi rei"],
-    "ナースロボ＿タイプＴ": ["ナースロボ＿タイプｔ", "ナースロボ_タイプt", "ナースロボ", "nursehoro"],
-    "唄音ウタ(デフォ子)": ["唄音ウタ", "デフォ子", "utane uta", "defoko"], "桃音モモ": ["桃音モモ", "momone momo"],
-    "重音テッド": ["重音テッド", "kasane ted"], "欲音ルコ": ["欲音ルコ", "yokune ruko"], "波音リツ": ["波音リツ", "namine ritsu"],
-    "健音テイ": ["健音テイ", "sukone tei"], "雪歌ユフ": ["雪歌ユフ", "sekka yufu"], "春歌ナナ": ["春歌ナナ", "haruka nana"],
-    "闇音レンリ": ["闇音レンリ", "yamine renri"], "ゲキヤク": ["ゲキヤク", "gekiyaku"], "カゼヒキ": ["カゼヒキ", "kazehiki"],
-    "咲音メイコ": ["咲音メイコ", "sakine meiko"], "骸音シーエ": ["骸音シーエ", "calne ca"], "雑音ミク": ["雑音ミク", "zatsune miku"],
-    "鋼音ミク": ["鋼音ミク", "hagane miku"], "アカイト": ["アカイト", "akaito"], "GUMI": ["gumi", "구미", "megpoid", "メグッポイド"],
-    "v_flower": ["v_flower", "flower", "플라워", "ci flower"], "IA": ["ia", "이아"], "歌愛ユキ": ["歌愛ユキ", "카아이 유키", "kaai yuki"],
-    "音街ウナ": ["音街ウナ", "오토마치 우나", "otomachi una"], "可不": ["可不", "kafu", "카후"], "星界": ["星界", "sekai", "세카이"],
-    "裏命": ["裏命", "rime", "리메"], "狐子": ["狐子", "coko", "코코"], "羽累": ["羽累", "haru"],
-    "知声": ["知声", "chis-a", "치세이"], "ずんだもん": ["ずんだもん", "준단몬", "zundamon"], "結月ゆかり": ["結月ゆかり", "유즈키 유카리", "yuzuki yukari"],
-    "紲星あかり": ["紲星あかり", "키즈나 아카리", "kizuna akari"], "琴葉姉妹": ["琴葉姉妹", "琴葉茜", "琴葉葵", "kotonoha"],
-    "小春六花": ["小春六花", "koharu rikka"], "夏色花梨": ["夏色花梨", "natsuiro karin"], "花隈千冬": ["花隈千冬", "hanakuma chifuyu"],
-    "宮舞モカ": ["宮舞モカ", "miyamai moka"], "弦巻マキ": ["弦巻マキ", "tsurumaki maki"], "さとうささら": ["さとうささら", "satou sasara"],
-    "すずきつづみ": ["すずきつづみ", "suzuki tsudumi"], "双葉湊音": ["双葉湊音", "futaba minato"], "東北きりたん": ["東北きりたん", "tohoku kiritan"],
-    "東北ずん子": ["東北ずん子", "tohoku zunko"], "東北イタコ": ["東北イタコ", "tohoku itako"], "神威がくぽ": ["神威がくぽ", "がくっぽいど", "kamui gakupo"],
-    "氷山キヨテル": ["氷山キヨテル", "hiyama kiyoteru"], "猫村いろは": ["猫村いろは", "nekomura iroha"], "miki": ["開発コードmiki", "sf-a2 miki"],
-    "MAYU": ["mayu"], "四国めたん": ["四国めたん", "shikoku metan"], "春日部つむぎ": ["春日部つむぎ", "kasukabe tsumugi"],
-    "冥鳴ひまり": ["冥鳴ひまり", "meimei himari"], "京町セイカ": ["京町セイカ", "kyomachi seika"], "ついなちゃん": ["ついなちゃん", "tsuina-chan"],
-    "桜乃そら": ["桜乃そら", "haruno sora"], "フリモメン": ["フリモメン", "frimomen"], "洛天依": ["洛天依", "luo tianyi"],
-    "心華": ["心華", "xin hua"], "SeeU": ["seeu", "시유"], "UNI": ["uni", "유니"],
-}
-
-NON_VOCALOID_GENRE_VOCALS = {
-    "yi xi", "이시", "奕夕", "solaria", "eleanor forte", "エレノア・フォルテ",
-    "kevin", "natalie", "ninezero", "asterian", "saros", "anri", "jun", "hayden",
-    "qing su", "mo chen", "an xiao", "feng yi", "cong zheng", "xuan yu", "cheng xiao", "weina",
-}
-
-DERIVATIVE_CHARACTERS = {"亞北ネル", "弱音ハク", "咲音メイコ", "雑音ミク", "鋼音ミク", "アカイト"}
-
-NG_KEYWORDS = [
-    "歌ってみた", "踊ってみた", "演奏してみた", "叩いてみた", "弾いてみた", "切り抜き", "まとめ", "メドレー", "カラオケ", "off vocal", "instrumental",
-    "reaction", "リアクション", "プロセカ", "プロジェクトセカイ", "譜面", "耐久", "1時間", "1 hour", "作業用", "解説", "ランキング", "比較", "mmd",
-    "mikumikudance", "yyb", "tda", "モデル", "モーション配布", "カメラモーション", "mmdモーション", "マイクラ", "マインクラフト", "minecraft", "再現", "レッドストーン", "音ブロック", "同時視聴",
-    "初見", "配信", "live", "ライブ", "チャンネル登録", "万人ありがとう", "#shorts", "shorts", "ショート", "tiktok", "違い", "感性プレイ", "ホロドリ",
-    "藤井風", "cover", "covered by", "커버", "불러보았다", "piano tutorial", "sheet music", "旅行", "車載", "散歩", "ツーリング", "ドライブ", "鉄道",
-    "夜景", "ゲートブリッジ", "行ってみた", "行ってみない", "食べてみた", "作ってみた", "描いてみた", "買ってみた", "ソフトウェアトーク", "voiceroid",
-    "voicepeak", "a.i.voice", "ボイロ", "ゆっくり", "実況", "プレイ動画", "ゲーム実況", "料理", "キッチン", "劇場", "茶番", "ラジオ", "雑談",
-    "重音テトが行く", "講座", "検証", "紹介", "レビュー", "ニュース", "カバー", "ｶﾊﾞｰ", "セルフカバー", "self cover", "替え歌", "パロディ", "parody",
-    "개사", "패러디", "재수머라이저", "팬메이드", "한글자막", "자막", "번역", "매쉬업", "알아보자", "非公式mv", "非公式pv", "ファンメイド", "ファンアニメ",
-    "二次創作", "2次創作", "fanmade", "fan made", "fan animation", "fan mv", "fan video", "fan animated", "animatic", "転載", "無断転載",
-    "中文字幕", "韓国語字幕", "字幕", "subbed", "eng sub", "kor sub", "translated", "reupload", "reprint", "archival", "nightcore", "mashup",
-    "マッシュアップ", "walkthrough", "tutorial", "チュートリアル", "デモンストレーション", "demonstration", "デモソング", "ボイスタイプ紹介",
-    "why vocaloid", "ai music video", "ai-generated", "ai generated", "tribute", "pear teto", "toxic gossip train", "butcher vanity",
-]
-
-NG_PRODUCER_KEYWORDS = [
-    "archive", "archival", "reupload", "reprint", "nightcore", "subbed", "translated", "parody",
-    "ai-generated", "ai generated", "teto kasane-chan", "alice clipton", "pika1978100", "harrymacdowel",
-    "horror skunx", "turbo lines music", "vane lily",
-]
-
-REQUIRED_MUSIC_INDICATORS = [
-    "vocaloid", "ボカロ", "보컬로이드", "ボカロオリジナル曲", "オリジナル曲", "synthesizerv", "synthesizer_v", "synthesizer v",
-    "synthv", "synthesizervオリジナル曲", "utauオリジナル曲", "cevioオリジナル曲", "voicevoxオリジナル曲", "ミクオリジナル曲",
-    "テトオリジナル曲", "重音テトsv", "可不オリジナル曲", "gumiオリジナル曲", "リンオリジナル曲", "レンオリジナル曲",
-    "ルカオリジナル曲", "flowerオリジナル曲", "ユキオリジナル曲", "レイオリジナル曲", "ウナオリジナル曲", "ゆかりオリジナル曲",
-    "vocarock", "ボカコレ", "vocacolle", "vocaloid新曲リンク", "vocaloid殿堂入り", "vocaloid伝説入り", "music video", "official mv", "【mv】", "[mv]",
-]
-
-META_BRACKET_RE = re.compile(
-    r"^(?:初音ミク|重音テト|重音テトSV|亞北ネル|亜北ネル|弱音ハク|GUMI|可不|鏡音リン|鏡音レン|巡音ルカ|flower|v_flower|IA|歌愛ユキ|ずんだもん|足立レイ|宮舞モカ|"
-    r"카사네\s*테토|하츠네\s*미쿠|보컬로이드|Kasane\s*Teto|Hatsune\s*Miku|VOCALOID|ボカロ|Synthesizer\s*V|SynthV|"
-    r"オリジナル|オリジナル曲|オリジナル曲PV|PV|MV|Official|Music\s*Video|公式|新曲)+$", re.IGNORECASE,
+from vocaloid_dict import (
+    DERIVATIVE_CHARACTERS, HUMAN_ARTIST_TYPES, ISO_DURATION_RE, KNOWN_CANONICAL_ORIGINALS,
+    META_BRACKET_RE, NC_ID_PATTERN, NG_KEYWORDS, NG_PRODUCER_KEYWORDS, NICONICO_ORIGINAL_TAGS,
+    NICONICO_STRICT_NON_ORIGINAL_TAGS, NON_VOCALOID_GENRE_VOCALS, REQUIRED_MUSIC_INDICATORS,
+    STRICT_NG_KEYWORDS, STRICT_WORD_BOUNDARY_NG_KEYWORDS, SYNTH_ARTIST_TYPES,
+    TITLE_ONLY_NG_KEYWORDS, VOCAL_SYNONYMS, WORD_BOUNDARY_NG_KEYWORDS, YT_ID_PATTERN,
 )
-
-YT_ID_PATTERN = re.compile(r"(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
-NC_ID_PATTERN = re.compile(r"(sm\d{7,9})")
-ISO_DURATION_RE = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?")
-
-KNOWN_CANONICAL_ORIGINALS = {
-    "igaku": "原口沙輔", "イガク": "原口沙輔", "mesmerizer": "サツキ", "メズマライザー": "サツキ",
-    "메소머라이저": "サツキ", "재수머라이저": "サツキ", "yararara": "abm", "ヤラララ": "abm",
-    "birdbrain": "ジェイミー", "トリアタマ": "ジェイミー", "혼돈부기": "jonyakitory", "混沌ブギ": "jonyakitory",
-    "천본앵": "黒うさ", "千本桜": "黒うさ", "토리노코시티": "40mp", "トリノコシティ": "40mp", "oddsends": "ryo",
-    "미스터리": "mimi", "ミステリー": "mimi", "루프더룸": "ルシノ", "ループザルーム": "ルシノ",
-    "loopingtherooms": "ルシノ", "ブレインロット": "東京真中",
-}
-
-HUMAN_ARTIST_TYPES = {"OtherVocalist", "Utaite", "OtherIndividual", "OtherGroup"}
-SYNTH_ARTIST_TYPES = {"Vocaloid", "UTAU", "SynthesizerV", "CeVIO", "VOICEVOX", "Neutrino", "VoiSona", "OtherVoiceSynthesizer"}
 
 
 def parse_iso_duration_seconds(duration_str: str) -> int:
@@ -111,7 +29,7 @@ def _find_keywords_with_pos(text_low: str, keywords: list) -> list:
     found = []
     for kw in keywords:
         kw_low = kw.lower()
-        if re.match(r"^[a-z0-9\s\-]+$", kw_low) and (len(kw_low) <= 4 or kw_low in NON_VOCALOID_GENRE_VOCALS):
+        if re.match(r"^[a-z0-9\s\-\.]+$", kw_low) and (len(kw_low) <= 4 or kw_low in NON_VOCALOID_GENRE_VOCALS):
             m = re.search(rf"\b{re.escape(kw_low)}\b", text_low)
             pos = m.start() if m else -1
         else:
@@ -194,17 +112,43 @@ def clean_song_title(raw_title: str, producer: str = "") -> str:
     return t.strip() or (raw_title or "").strip()
 
 
+def has_ng_in_title(title_low: str) -> bool:
+    """タイトル内のNGワード判定（英単語には単語境界を適用し部分一致誤爆を防ぐ）"""
+    t_low = (title_low or "").lower()
+    if any(ng in t_low for ng in STRICT_NG_KEYWORDS) or any(ng in t_low for ng in TITLE_ONLY_NG_KEYWORDS):
+        return True
+    return any(re.search(rf"\b{re.escape(kw)}\b", t_low) for kw in WORD_BOUNDARY_NG_KEYWORDS)
+
+
+def has_ng_in_tags(tags_low: str, has_niconico_original_tag: bool = False) -> bool:
+    """タグ内のNGワード判定（ニコ動本家オリジナルタグがある場合は視聴者タグノイズを許容する）"""
+    cleaned_tags = re.sub(r"(?:歌ってみた|踊ってみた|演奏してみた|叩いてみた|弾いてみた)支援", "", (tags_low or "").lower())
+    if has_niconico_original_tag:
+        return any(ng in cleaned_tags for ng in NICONICO_STRICT_NON_ORIGINAL_TAGS)
+    if any(ng in cleaned_tags for ng in STRICT_NG_KEYWORDS):
+        return True
+    return any(re.search(rf"\b{re.escape(kw)}\b", cleaned_tags) for kw in STRICT_WORD_BOUNDARY_NG_KEYWORDS)
+
+
 def is_valid_vocaloid_mv(
     title: str, description: str = "", tags: str = "", duration_sec: int = 180,
     is_niconico: bool = False, yt_category_id: str = "10", producer: str = "", has_niconico: bool = False,
 ) -> bool:
-    if duration_sec < 90 or duration_sec > 420:
+    if duration_sec < 60 or duration_sec > 600:
         return False
     t_low, d_low, tags_low, p_low = (title or "").lower(), (description or "").lower(), (tags or "").lower(), (producer or "").lower()
-    if any(ng in t_low or ng in tags_low for ng in NG_KEYWORDS) or (p_low and any(ng_p in p_low for ng_p in NG_PRODUCER_KEYWORDS)):
+    if has_ng_in_title(t_low) or (p_low and any(ng_p in p_low for ng_p in NG_PRODUCER_KEYWORDS)):
+        return False
+
+    has_nc_orig_tag = is_niconico and any(ind in f"{t_low} {tags_low}" for ind in NICONICO_ORIGINAL_TAGS)
+    if has_ng_in_tags(tags_low, has_niconico_original_tag=has_nc_orig_tag):
         return False
     if "#shorts" in d_low or "mikumikudance" in d_low or "yyb式" in d_low or "tda式" in d_low:
         return False
+    if not is_niconico and not has_niconico and duration_sec < 90:
+        all_txt = f"{t_low} {tags_low} {d_low}"
+        if "#shorts" in all_txt or re.search(r"\bshorts\b", all_txt):
+            return False
     if is_niconico and not any(ind in f"{t_low} {tags_low}" for ind in REQUIRED_MUSIC_INDICATORS):
         return False
     if not is_niconico and yt_category_id not in ["10", ""] and not any(ind in f"{t_low} {tags_low} {d_low[:200]}" for ind in REQUIRED_MUSIC_INDICATORS):
@@ -303,7 +247,7 @@ def is_eligible_ranking_song(song_dict: dict, canonical_originals: dict = None) 
     title, prod, vocal = str(song_dict.get("title") or ""), str(song_dict.get("producer") or ""), str(song_dict.get("vocal") or "")
     nid = str(song_dict.get("niconico_id") or song_dict.get("nc_id") or "").strip()
     t_low, p_low = title.lower(), prod.lower()
-    if any(ng in t_low for ng in NG_KEYWORDS) or (p_low and any(ng_p in p_low for ng_p in NG_PRODUCER_KEYWORDS)):
+    if has_ng_in_title(t_low) or (p_low and any(ng_p in p_low for ng_p in NG_PRODUCER_KEYWORDS)):
         return False
     if nid:
         return True
