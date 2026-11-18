@@ -17,6 +17,10 @@ JST = timezone(timedelta(hours=9))
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent if BASE_DIR.name in ("backend", "scripts", "src") else BASE_DIR
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from vocaloid_filter import build_canonical_originals_map, clean_song_title, is_eligible_ranking_song
 
 
 def resolve_config_path(attr_names, default_rel_path):
@@ -719,8 +723,15 @@ def main():
     appearance_counts, prev_chart_map = build_historical_stats(past_charts)
 
     # 今週の初回ドラフトが既に存在する場合は、週途中の再実行で順位やポイントが変わらないよう月曜初回ドラフトのランキングを復元・固定する
-    if earliest_week_draft is not None and not force_recalc:
-        locked_songs = extract_songs_list(earliest_week_draft)[:TOP_N]
+    locked_candidates = extract_songs_list(earliest_week_draft)[:TOP_N] if earliest_week_draft is not None else []
+    locked_canonical = build_canonical_originals_map(locked_candidates + extract_songs_list(load_json(MASTER_FILE)))
+    if (
+        earliest_week_draft is not None
+        and not force_recalc
+        and locked_candidates
+        and all(is_eligible_ranking_song(s, locked_canonical) for s in locked_candidates)
+    ):
+        locked_songs = locked_candidates
         for idx, s in enumerate(locked_songs, start=1):
             s["rank"] = idx
             keys = get_song_keys(s)
@@ -777,6 +788,7 @@ def main():
             songs_list = extract_songs_list(existing_draft)
 
         combined_candidates = list(songs_list) + [s for s in snap_list if isinstance(s, dict)]
+        canonical_map = build_canonical_originals_map(combined_candidates)
 
         scored_songs = []
         seen_song_keys = set()
@@ -787,6 +799,8 @@ def main():
 
             keys = get_song_keys(song)
             if not keys or (keys & seen_song_keys):
+                continue
+            if not is_eligible_ranking_song(song, canonical_map):
                 continue
 
             cur_m = {}
@@ -849,6 +863,7 @@ def main():
             title_val = cur_m.get("title") or song.get("title") or "不明な楽曲"
             prod_val = cur_m.get("producer") or song.get("producer") or "不明"
             vocal_val = cur_m.get("vocal") or song.get("vocal") or "VOCALOID"
+            title_val = clean_song_title(title_val, prod_val)
             for k in keys:
                 if k in saved_edits:
                     title_val = saved_edits[k].get("title", title_val)
@@ -882,6 +897,8 @@ def main():
                 "pts": pts_breakdown,
                 "commentary": commentary,
             }
+            if not is_eligible_ranking_song(song_entry, canonical_map):
+                continue
             scored_songs.append(song_entry)
 
         scored_songs.sort(key=lambda x: (-x["total_pt"], str(x.get("song_id", ""))))
