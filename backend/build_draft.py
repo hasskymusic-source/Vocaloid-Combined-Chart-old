@@ -1,9 +1,12 @@
 import os
+import re
+import sys
 import json
 import glob
+import subprocess
 import urllib.request
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 try:
     import config
@@ -49,7 +52,6 @@ DEFAULT_WEIGHTS = {
 WEIGHTS = getattr(config, "WEIGHTS", DEFAULT_WEIGHTS) if config else DEFAULT_WEIGHTS
 TOP_N = getattr(config, "TOP_N", 20) if config else 20
 
-# 新譜として初週の累計値算入を認める最大経過日数（集計期間7日＋タイムゾーン・先行公開バッファ3日＝10日）
 MAX_NEW_SONG_AGE_DAYS = 10.0
 
 
@@ -101,6 +103,133 @@ def get_song_keys(song_obj):
     if nc_id:
         keys.add(f"nc:{nc_id}")
     return keys
+
+
+def _git_log_commits(rel_paths: list, max_count: int = 60) -> list:
+    try:
+        res = subprocess.run(
+            ["git", "log", f"-n{max_count}", "--format=%H", "--"] + rel_paths,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+    except Exception:
+        pass
+    return []
+
+
+def _git_show_json(commit_hash: str, rel_path: str):
+    try:
+        res = subprocess.run(
+            ["git", "show", f"{commit_hash}:{rel_path}"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return json.loads(res.stdout)
+    except Exception:
+        pass
+    return None
+
+
+def infer_archive_id_and_period(chart_data: dict) -> tuple:
+    """チャート辞書から一意な archiveId (YYYY-MM-DD: 水曜公開日) と正規化 period を推論する"""
+    if not isinstance(chart_data, dict):
+        return "", ""
+
+    raw_period = str(chart_data.get("period") or "").strip()
+    norm_period = raw_period
+    inferred_wed = ""
+
+    m = re.match(
+        r"^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*[\-~〜]\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*$",
+        raw_period,
+    )
+    if m:
+        start_d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        end_d = date(int(m.group(4)), int(m.group(5)), int(m.group(6)))
+        if (end_d - start_d).days == 7:
+            end_d = end_d - timedelta(days=1)
+        norm_period = f"{start_d.strftime('%Y/%m/%d')} - {end_d.strftime('%Y/%m/%d')}"
+        # 集計開始月曜の9日後＝翌週水曜日（公開日）
+        wed_d = start_d + timedelta(days=9)
+        inferred_wed = wed_d.strftime("%Y-%m-%d")
+
+    aid = str(chart_data.get("archiveId") or chart_data.get("publishDate") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", aid):
+        if inferred_wed:
+            aid = inferred_wed
+        else:
+            for field in ("published_at", "updated_at"):
+                val = str(chart_data.get(field) or "").strip()
+                m_dt = re.match(r"^(\d{4})[\/\-](\d{2})[\/\-](\d{2})", val)
+                if m_dt:
+                    aid = f"{m_dt.group(1)}-{m_dt.group(2)}-{m_dt.group(3)}"
+                    break
+
+    return aid, norm_period
+
+
+def rescue_past_archives_from_git(current_archive_id: str):
+    """
+    Git履歴にある過去の latest_ranking.json / weekly_draft.json から、
+    上書き等で消えてしまった過去週のランキング（例: 2026-10-14公開分など）を自動救出し、
+    public/data/archives/ および data/archives/ に復元する。
+    """
+    rel_Targets = [
+        "public/data/latest_ranking.json",
+        "data/latest_ranking.json",
+        "data/drafts/weekly_draft.json",
+        "data/weekly_draft.json",
+    ]
+    commits = _git_log_commits(rel_Targets, max_count=80)
+    rescued_by_id = {}
+
+    # 古いコミットから新しいコミットの順に走査し、過去週の最終状態（解説入り）を取得
+    for chash in reversed(commits):
+        for rel_p in rel_Targets:
+            data = _git_show_json(chash, rel_p)
+            if not isinstance(data, dict):
+                continue
+            songs = extract_songs_list(data)
+            if not songs:
+                continue
+            aid, norm_prd = infer_archive_id_and_period(data)
+            if not aid or aid >= current_archive_id:
+                continue
+
+            data["archiveId"] = aid
+            data["publishDate"] = aid
+            data["publishAt"] = data.get("publishAt") or f"{aid}T13:00:00+09:00"
+            if norm_prd:
+                data["period"] = norm_prd
+            data["songs"] = songs
+            data["ranking"] = songs
+
+            # 既に救出候補がある場合、解説文がより充実している方を優先して保持
+            if aid in rescued_by_id:
+                old_c = sum(1 for s in extract_songs_list(rescued_by_id[aid]) if s.get("commentary"))
+                new_c = sum(1 for s in songs if s.get("commentary"))
+                if new_c >= old_c:
+                    rescued_by_id[aid] = data
+            else:
+                rescued_by_id[aid] = data
+
+    for aid, chart_obj in rescued_by_id.items():
+        for out_dir in (ARCHIVE_DIR, PROJECT_ROOT / "data/archives"):
+            out_file = out_dir / f"{aid}.json"
+            if not out_file.exists():
+                save_json(out_file, chart_obj)
+                print(f"[ARCHIVE RESCUE] Git履歴から過去ランキング ({aid}) を復元しました: {out_file}")
 
 
 def parse_iso_datetime(dt_str):
@@ -166,10 +295,6 @@ def compute_new_release_factor(pub_dt, ref_dt):
 
 
 def compute_chart_dates(now_dt=None):
-    """
-    今週の月曜日を基準として、直前の月曜日〜日曜日（7日間）を集計期間として算出する。
-    さらに公開解禁日時として「今週の水曜日 13:00:00 JST (publishAt)」を設定する。
-    """
     if now_dt is None:
         now_dt = datetime.now(JST)
     today = now_dt.date()
@@ -242,8 +367,8 @@ def collect_past_charts(exclude_archive_id=None, exclude_period=None):
         if not songs:
             continue
 
-        aid = data.get("archiveId") or data.get("chart_id") or data.get("publishDate")
-        prd = data.get("period")
+        aid, norm_prd = infer_archive_id_and_period(data)
+        prd = norm_prd or data.get("period")
         key = aid or prd or os.path.splitext(fname)[0]
 
         if exclude_archive_id and aid == exclude_archive_id:
@@ -281,10 +406,62 @@ def build_historical_stats(past_charts):
     return appearance_counts, prev_chart_map
 
 
-def preserve_existing_commentary():
+def find_monday_locked_draft_and_preserve_edits(archive_id: str, period_str: str):
+    """
+    【月曜ドラフト固定ロック＆執筆データ完全保護システム】
+    1. Git履歴とローカルファイルの両方から、今週（archive_id）の解説文(commentary)・総括(weeklySummary)・
+       表記修正(title/producer/vocal)を漏れなく収集する。
+    2. Git履歴に今週（archive_id）の初回ドラフト（月曜集計時の20曲・ポイント・順位）が存在する場合は、
+       週途中の再実行で順位やポイントが変わらないよう、初回ドラフトの順位・ポイントを基準としてロックする。
+    """
     saved_song_comments = {}
+    saved_song_edits = {}
     saved_meta = {}
+    earliest_week_draft = None
 
+    rel_draft_paths = [
+        "data/drafts/weekly_draft.json",
+        "data/weekly_draft.json",
+        "public/data/latest_ranking.json",
+    ]
+    commits = _git_log_commits(rel_draft_paths, max_count=50)
+
+    def _harvest_from_dict(data_dict: dict):
+        if not isinstance(data_dict, dict):
+            return
+        for meta_key in ("weeklySummary", "overall_commentary", "trend_analysis", "editor_note"):
+            val = data_dict.get(meta_key)
+            if val and str(val).strip():
+                saved_meta[meta_key] = str(val).strip()
+
+        for item in extract_songs_list(data_dict):
+            keys = get_song_keys(item)
+            comment = item.get("commentary") or item.get("comment")
+            if comment and str(comment).strip():
+                for k in keys:
+                    saved_song_comments[k] = str(comment).strip()
+            edits = {}
+            for fld in ("title", "producer", "vocal"):
+                if item.get(fld) and str(item.get(fld)).strip():
+                    edits[fld] = str(item.get(fld)).strip()
+            if edits:
+                for k in keys:
+                    saved_song_edits[k] = edits
+
+    # 古いコミットから新しいコミットへ順に走査
+    for chash in reversed(commits):
+        for rel_p in rel_draft_paths:
+            d = _git_show_json(chash, rel_p)
+            if not isinstance(d, dict):
+                continue
+            aid, norm_prd = infer_archive_id_and_period(d)
+            if aid == archive_id or norm_prd == period_str:
+                songs = extract_songs_list(d)
+                if songs and len(songs) >= 5 and earliest_week_draft is None:
+                    earliest_week_draft = d
+                _harvest_from_dict(d)
+
+    # ローカルファイル（最新の執筆スタジオ保存分）を最後に上書き適用して最優先にする
     candidate_files = [
         BACKUP_DRAFT_FILE,
         DRAFT_FILE,
@@ -293,23 +470,15 @@ def preserve_existing_commentary():
         PROJECT_ROOT / "data/weekly_draft.backup.json",
         PROJECT_ROOT / "data/weekly_draft.json",
     ]
-
     for path in candidate_files:
         data = load_json(path)
         if not isinstance(data, dict):
             continue
-        for meta_key in ("weeklySummary", "overall_commentary", "trend_analysis", "editor_note"):
-            val = data.get(meta_key)
-            if val and str(val).strip():
-                saved_meta[meta_key] = val
+        aid, norm_prd = infer_archive_id_and_period(data)
+        if aid == archive_id or norm_prd == period_str or not aid:
+            _harvest_from_dict(data)
 
-        for item in extract_songs_list(data):
-            comment = item.get("commentary") or item.get("comment")
-            if comment and str(comment).strip():
-                for k in get_song_keys(item):
-                    saved_song_comments[k] = comment
-
-    return saved_song_comments, saved_meta
+    return earliest_week_draft, saved_song_comments, saved_song_edits, saved_meta
 
 
 def get_nc_mylist_value(metrics_dict):
@@ -409,11 +578,6 @@ def calculate_song_points(song, current_metrics, prev_metrics, reference_dt):
 
 
 def generate_private_owner_report(draft_data: dict) -> Path:
-    """
-    【運営者手元専用・詳細レポート生成＆通知システム】
-    本番サイトで水曜13:00に解禁される前に、あなたの手元（ローカルPCおよび執筆スタジオ）で
-    ランキング全20曲の6指標内訳・前週比率・視聴URLを即座に把握できる詳細レポートを生成する。
-    """
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     archive_id = draft_data.get("archiveId", "latest")
     period = draft_data.get("period", "")
@@ -503,7 +667,6 @@ def generate_private_owner_report(draft_data: dict) -> Path:
     latest_report_path.write_text(report_text, encoding="utf-8")
     dated_report_path.write_text(report_text, encoding="utf-8")
 
-    # 環境変数 RANKING_NOTIFY_WEBHOOK_URL が設定されている場合は Discord / Slack へ自動通知
     webhook_url = os.environ.get("RANKING_NOTIFY_WEBHOOK_URL", "").strip()
     if webhook_url:
         try:
@@ -536,143 +699,198 @@ def generate_private_owner_report(draft_data: dict) -> Path:
 
 
 def main():
-    print("=== 週刊VOCALOID複合ランキング ドラフト生成開始 ===")
+    force_recalc = "--force" in sys.argv
+    print("=== 週刊VOCALOID複合ランキング ドラフト生成・整合性チェック開始 ===")
     now_dt = datetime.now(JST)
     period_str, publish_date, archive_id, publish_at, reference_dt = compute_chart_dates(now_dt)
+
+    # 過去週のアーカイブが欠損していればGit履歴から先に自動救出
+    rescue_past_archives_from_git(current_archive_id=archive_id)
 
     existing_draft = load_json(DRAFT_FILE)
     if existing_draft:
         save_json(BACKUP_DRAFT_FILE, existing_draft)
-    saved_comments, saved_meta = preserve_existing_commentary()
+
+    earliest_week_draft, saved_comments, saved_edits, saved_meta = find_monday_locked_draft_and_preserve_edits(
+        archive_id, period_str
+    )
 
     past_charts = collect_past_charts(exclude_archive_id=archive_id, exclude_period=period_str)
     appearance_counts, prev_chart_map = build_historical_stats(past_charts)
 
-    latest_snap, prev_snap = get_two_latest_snapshots()
-    cur_map = extract_metrics_dict(latest_snap)
-    prv_map = extract_metrics_dict(prev_snap)
+    # 今週の初回ドラフトが既に存在する場合は、週途中の再実行で順位やポイントが変わらないよう月曜初回ドラフトのランキングを復元・固定する
+    if earliest_week_draft is not None and not force_recalc:
+        locked_songs = extract_songs_list(earliest_week_draft)[:TOP_N]
+        for idx, s in enumerate(locked_songs, start=1):
+            s["rank"] = idx
+            keys = get_song_keys(s)
 
-    snap_list = extract_songs_list(latest_snap)
-    if snap_list and snap_list[0].get("updated_at"):
-        parsed_snap_dt = parse_iso_datetime(snap_list[0].get("updated_at"))
-        if parsed_snap_dt:
-            reference_dt = parsed_snap_dt
+            # 過去チャートから正確な週数・前週順位を再照合
+            past_count = 0
+            prev_info = None
+            for k in keys:
+                if k in appearance_counts:
+                    past_count = max(past_count, appearance_counts[k])
+                if k in prev_chart_map and prev_info is None:
+                    prev_info = prev_chart_map[k]
 
-    master_data = load_json(MASTER_FILE)
-    songs_list = extract_songs_list(master_data)
-    if not songs_list:
-        songs_list = snap_list
-    if not songs_list and isinstance(existing_draft, dict):
-        songs_list = extract_songs_list(existing_draft)
+            if prev_info:
+                s["prev_rank"] = prev_info["prev_rank"]
+                s["prevRank"] = prev_info["prev_rank"]
+                s["prev_total_pt"] = prev_info["prev_total_pt"]
+                if prev_info["prev_total_pt"] and prev_info["prev_total_pt"] > 0:
+                    s["pt_ratio"] = round((s.get("total_pt", 0) / prev_info["prev_total_pt"]) * 100)
+            s["chart_in_count"] = max(int(s.get("chart_in_count") or 1), past_count + 1)
 
-    combined_candidates = list(songs_list) + [s for s in snap_list if isinstance(s, dict)]
+            # 執筆された解説文・表記修正を確実に反映
+            for k in keys:
+                if k in saved_comments:
+                    s["commentary"] = saved_comments[k]
+                    break
+            for k in keys:
+                if k in saved_edits:
+                    for fld, val in saved_edits[k].items():
+                        s[fld] = val
+                    break
 
-    scored_songs = []
-    seen_song_keys = set()
-    skipped_unmeasured_old_songs = 0
-
-    for song in combined_candidates:
-        if not isinstance(song, dict):
-            continue
-
-        keys = get_song_keys(song)
-        if not keys or (keys & seen_song_keys):
-            continue
-
-        cur_m = {}
-        prv_m = {}
-        for k in keys:
-            if k in cur_map:
-                cur_m = cur_map[k]
-                break
-        for k in keys:
-            if k in prv_map:
-                prv_m = prv_map[k]
-                break
-
-        if not cur_m and not song.get("yt_views") and not song.get("nc_views"):
-            continue
-
-        total_pt, raw_gains, pts_breakdown, resolved_pub_str = calculate_song_points(
-            song, cur_m, prv_m, reference_dt
+        top_songs = locked_songs
+        print(
+            f"[LOCKED & RESTORED] 今週分 ({archive_id}) の初回集計ドラフトを基準に順位・ポイントを固定し、"
+            f"執筆済みの解説文を統合しました（1位: {top_songs[0].get('title')} / {top_songs[0].get('total_pt'):,} pt）。"
         )
-        if total_pt <= 0:
-            if not prv_m:
-                skipped_unmeasured_old_songs += 1
-            continue
+    else:
+        latest_snap, prev_snap = get_two_latest_snapshots()
+        cur_map = extract_metrics_dict(latest_snap)
+        prv_map = extract_metrics_dict(prev_snap)
 
-        seen_song_keys.update(keys)
+        snap_list = extract_songs_list(latest_snap)
+        if snap_list and snap_list[0].get("updated_at"):
+            parsed_snap_dt = parse_iso_datetime(snap_list[0].get("updated_at"))
+            if parsed_snap_dt:
+                reference_dt = parsed_snap_dt
 
-        past_count = 0
-        prev_info = None
-        for k in keys:
-            if k in appearance_counts:
-                past_count = max(past_count, appearance_counts[k])
-            if k in prev_chart_map and prev_info is None:
-                prev_info = prev_chart_map[k]
+        master_data = load_json(MASTER_FILE)
+        songs_list = extract_songs_list(master_data)
+        if not songs_list:
+            songs_list = snap_list
+        if not songs_list and isinstance(existing_draft, dict):
+            songs_list = extract_songs_list(existing_draft)
 
-        prev_rank = prev_info["prev_rank"] if prev_info else None
-        prev_total_pt = prev_info["prev_total_pt"] if prev_info else None
+        combined_candidates = list(songs_list) + [s for s in snap_list if isinstance(s, dict)]
 
-        pt_ratio = None
-        if prev_total_pt is not None and prev_total_pt > 0:
-            pt_ratio = round((total_pt / prev_total_pt) * 100)
+        scored_songs = []
+        seen_song_keys = set()
 
-        commentary = song.get("commentary") or song.get("comment") or ""
-        for k in keys:
-            if k in saved_comments:
-                commentary = saved_comments[k]
-                break
+        for song in combined_candidates:
+            if not isinstance(song, dict):
+                continue
 
-        yt_id = (
-            song.get("youtube_id")
-            or song.get("yt_id")
-            or cur_m.get("youtube_id")
-            or cur_m.get("yt_id")
-        )
-        nc_id = (
-            song.get("niconico_id")
-            or song.get("nc_id")
-            or cur_m.get("niconico_id")
-            or cur_m.get("nc_id")
-        )
-        primary_id = song.get("song_id") or song.get("id") or (f"song_{nc_id}" if nc_id else f"song_{yt_id}")
+            keys = get_song_keys(song)
+            if not keys or (keys & seen_song_keys):
+                continue
 
-        song_entry = {
-            "id": primary_id,
-            "song_id": primary_id,
-            "title": cur_m.get("title") or song.get("title") or "不明な楽曲",
-            "producer": cur_m.get("producer") or song.get("producer") or "不明",
-            "vocal": cur_m.get("vocal") or song.get("vocal") or "VOCALOID",
-            "youtube_id": yt_id,
-            "niconico_id": nc_id,
-            "thumbnail": (
-                song.get("thumbnail")
-                or cur_m.get("thumbnail")
-                or (f"https://i.ytimg.com/vi/{yt_id}/mqdefault.jpg" if yt_id else "")
-            ),
-            "published_at": resolved_pub_str or song.get("published_at") or cur_m.get("published_at") or "",
-            "total_pt": total_pt,
-            "yt_total_pt": pts_breakdown["yt_total"],
-            "nc_total_pt": pts_breakdown["nc_total"],
-            "prevRank": prev_rank if prev_rank is not None else "NEW",
-            "prev_rank": prev_rank,
-            "prev_total_pt": prev_total_pt,
-            "pt_ratio": pt_ratio,
-            "_past_chart_in_count": past_count,
-            "raw": raw_gains,
-            "pts": pts_breakdown,
-            "commentary": commentary,
-        }
-        scored_songs.append(song_entry)
+            cur_m = {}
+            prv_m = {}
+            for k in keys:
+                if k in cur_map:
+                    cur_m = cur_map[k]
+                    break
+            for k in keys:
+                if k in prv_map:
+                    prv_m = prv_map[k]
+                    break
 
-    scored_songs.sort(key=lambda x: (-x["total_pt"], str(x.get("song_id", ""))))
-    top_songs = scored_songs[:TOP_N]
+            if not cur_m and not song.get("yt_views") and not song.get("nc_views"):
+                continue
 
-    for idx, item in enumerate(top_songs, start=1):
-        item["rank"] = idx
-        past_c = item.pop("_past_chart_in_count", 0)
-        item["chart_in_count"] = past_c + 1
+            total_pt, raw_gains, pts_breakdown, resolved_pub_str = calculate_song_points(
+                song, cur_m, prv_m, reference_dt
+            )
+            if total_pt <= 0:
+                continue
+
+            seen_song_keys.update(keys)
+
+            past_count = 0
+            prev_info = None
+            for k in keys:
+                if k in appearance_counts:
+                    past_count = max(past_count, appearance_counts[k])
+                if k in prev_chart_map and prev_info is None:
+                    prev_info = prev_chart_map[k]
+
+            prev_rank = prev_info["prev_rank"] if prev_info else None
+            prev_total_pt = prev_info["prev_total_pt"] if prev_info else None
+
+            pt_ratio = None
+            if prev_total_pt is not None and prev_total_pt > 0:
+                pt_ratio = round((total_pt / prev_total_pt) * 100)
+
+            commentary = song.get("commentary") or song.get("comment") or ""
+            for k in keys:
+                if k in saved_comments:
+                    commentary = saved_comments[k]
+                    break
+
+            yt_id = (
+                song.get("youtube_id")
+                or song.get("yt_id")
+                or cur_m.get("youtube_id")
+                or cur_m.get("yt_id")
+            )
+            nc_id = (
+                song.get("niconico_id")
+                or song.get("nc_id")
+                or cur_m.get("niconico_id")
+                or cur_m.get("nc_id")
+            )
+            primary_id = song.get("song_id") or song.get("id") or (f"song_{nc_id}" if nc_id else f"song_{yt_id}")
+
+            title_val = cur_m.get("title") or song.get("title") or "不明な楽曲"
+            prod_val = cur_m.get("producer") or song.get("producer") or "不明"
+            vocal_val = cur_m.get("vocal") or song.get("vocal") or "VOCALOID"
+            for k in keys:
+                if k in saved_edits:
+                    title_val = saved_edits[k].get("title", title_val)
+                    prod_val = saved_edits[k].get("producer", prod_val)
+                    vocal_val = saved_edits[k].get("vocal", vocal_val)
+                    break
+
+            song_entry = {
+                "id": primary_id,
+                "song_id": primary_id,
+                "title": title_val,
+                "producer": prod_val,
+                "vocal": vocal_val,
+                "youtube_id": yt_id,
+                "niconico_id": nc_id,
+                "thumbnail": (
+                    song.get("thumbnail")
+                    or cur_m.get("thumbnail")
+                    or (f"https://i.ytimg.com/vi/{yt_id}/mqdefault.jpg" if yt_id else "")
+                ),
+                "published_at": resolved_pub_str or song.get("published_at") or cur_m.get("published_at") or "",
+                "total_pt": total_pt,
+                "yt_total_pt": pts_breakdown["yt_total"],
+                "nc_total_pt": pts_breakdown["nc_total"],
+                "prevRank": prev_rank if prev_rank is not None else "NEW",
+                "prev_rank": prev_rank,
+                "prev_total_pt": prev_total_pt,
+                "pt_ratio": pt_ratio,
+                "_past_chart_in_count": past_count,
+                "raw": raw_gains,
+                "pts": pts_breakdown,
+                "commentary": commentary,
+            }
+            scored_songs.append(song_entry)
+
+        scored_songs.sort(key=lambda x: (-x["total_pt"], str(x.get("song_id", ""))))
+        top_songs = scored_songs[:TOP_N]
+
+        for idx, item in enumerate(top_songs, start=1):
+            item["rank"] = idx
+            past_c = item.pop("_past_chart_in_count", 0)
+            item["chart_in_count"] = past_c + 1
 
     now_str = now_dt.strftime("%Y-%m-%d %H:%M")
     weekly_summary = (

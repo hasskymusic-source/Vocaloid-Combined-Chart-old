@@ -1,11 +1,13 @@
 import json
 import os
 import shutil
+import subprocess
+import sys
 import time
 import xml.etree.ElementTree as ET
 import requests
 from datetime import datetime, timedelta, timezone
-from config import MASTER_FILE, PREV_SNAPSHOT, LATEST_SNAPSHOT
+from config import BASE_DIR, MASTER_FILE, PREV_SNAPSHOT, LATEST_SNAPSHOT
 from discover_songs import clean_song_title, detect_vocals, search_youtube_id_web_strict
 from googleapiclient.discovery import build
 
@@ -33,31 +35,144 @@ def get_monday_date_str(dt_str: str) -> str:
         return ""
 
 
-def rotate_snapshots_if_needed():
-    """
-    【週次スナップショット保護ローテーション】
-    latest_monday.json の記録日が「今週より前の週」である場合のみ prev_monday.json にローテーションする。
-    同じ週の途中でテストや改修のために再実行した際は prev_monday.json を絶対に上書きしない。
-    """
-    if not LATEST_SNAPSHOT.exists():
-        return
+def _git_log_commits(rel_path: str, max_count: int = 40) -> list:
     try:
-        with open(LATEST_SNAPSHOT, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not data or not isinstance(data, list) or len(data) < 5:
-            return
-        updated_str = data[0].get("updated_at", "")
-        last_monday_str = get_monday_date_str(updated_str)
-        now_monday_str = get_monday_date_str(datetime.now(JST).isoformat())
+        res = subprocess.run(
+            ["git", "log", f"-n{max_count}", "--format=%H", "--", rel_path],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+    except Exception:
+        pass
+    return []
 
-        if last_monday_str and now_monday_str and last_monday_str < now_monday_str:
+
+def _git_show_json(commit_hash: str, rel_path: str):
+    try:
+        res = subprocess.run(
+            ["git", "show", f"{commit_hash}:{rel_path}"],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return json.loads(res.stdout)
+    except Exception:
+        pass
+    return None
+
+
+def restore_and_lock_monday_snapshot_if_same_week(force_refresh: bool = False) -> bool:
+    """
+    【週次スナップショット完全ロック＆Git履歴からの月曜データ自動復元機構】
+    1. Git履歴を走査し、今週（now_monday_str）に記録された最も古い（＝月曜本来の）latest_monday.json と、
+       前週以前の最新のスナップショット（prev_monday.json用）を特定する。
+    2. もし週の途中（水曜など）の再実行で latest_monday.json が上書きされていた場合は、
+       月曜時点のスナップショットへ自動的に巻き戻す。
+    3. 今週分のスナップショットが既に存在する場合は True を返し、週途中の再取得によるポイント変動を完全に防止する。
+    """
+    now_monday_str = get_monday_date_str(datetime.now(JST).isoformat())
+    rel_latest = "data/snapshots/latest_monday.json"
+    commits = _git_log_commits(rel_latest, max_count=40)
+
+    earliest_this_week_snap = None
+    earliest_this_week_ts = ""
+    latest_prev_week_snap = None
+    latest_prev_week_monday = ""
+
+    # 古いコミットから順に走査して「今週最初のスナップショット」と「前週以前のスナップショット」を特定
+    for chash in reversed(commits):
+        snap_data = _git_show_json(chash, rel_latest)
+        if not isinstance(snap_data, list) or len(snap_data) < 5:
+            continue
+        upd_str = snap_data[0].get("updated_at", "")
+        snap_monday = get_monday_date_str(upd_str)
+        if not snap_monday:
+            continue
+
+        if snap_monday == now_monday_str:
+            if earliest_this_week_snap is None:
+                earliest_this_week_snap = snap_data
+                earliest_this_week_ts = upd_str
+        elif snap_monday < now_monday_str:
+            latest_prev_week_snap = snap_data
+            latest_prev_week_monday = snap_monday
+
+    # 前週スナップショットの保護・復元
+    if latest_prev_week_snap is not None:
+        need_prev_restore = not PREV_SNAPSHOT.exists()
+        if not need_prev_restore:
+            try:
+                cur_prev = json.loads(PREV_SNAPSHOT.read_text(encoding="utf-8"))
+                if not isinstance(cur_prev, list) or len(cur_prev) < 5:
+                    need_prev_restore = True
+                else:
+                    pm = get_monday_date_str(cur_prev[0].get("updated_at", ""))
+                    if pm >= now_monday_str:
+                        need_prev_restore = True
+            except Exception:
+                need_prev_restore = True
+
+        if need_prev_restore:
             PREV_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(LATEST_SNAPSHOT, PREV_SNAPSHOT)
-            print(f"前週のスナップショット ({last_monday_str}週) を prev_monday.json にローテーションしました。")
+            with open(PREV_SNAPSHOT, "w", encoding="utf-8") as f:
+                json.dump(latest_prev_week_snap, f, ensure_ascii=False, indent=2)
+            print(f"[RESTORE] Git履歴から前週スナップショット ({latest_prev_week_monday}週) を prev_monday.json に復元しました。")
+
+    # 今週の月曜スナップショットがGit履歴に存在する場合、週途中の上書きがあれば月曜時点に巻き戻してロックする
+    if earliest_this_week_snap is not None and not force_refresh:
+        LATEST_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+        cur_ts = ""
+        if LATEST_SNAPSHOT.exists():
+            try:
+                cur_latest = json.loads(LATEST_SNAPSHOT.read_text(encoding="utf-8"))
+                if isinstance(cur_latest, list) and cur_latest:
+                    cur_ts = cur_latest[0].get("updated_at", "")
+            except Exception:
+                pass
+
+        if cur_ts != earliest_this_week_ts:
+            with open(LATEST_SNAPSHOT, "w", encoding="utf-8") as f:
+                json.dump(earliest_this_week_snap, f, ensure_ascii=False, indent=2)
+            print(
+                f"[RESTORE & LOCK] 週の途中で再取得されたスナップショット({cur_ts})を検知したため、"
+                f"今週初回取得時({earliest_this_week_ts})のデータへ自動復元しました。"
+            )
         else:
-            print(f"同一週 ({now_monday_str}週) の実行のため、prev_monday.json を保護（維持）しました。")
-    except Exception as e:
-        print(f"Snapshot rotation check skipped: {e}")
+            print(
+                f"[LOCKED] 今週分 ({now_monday_str}週 / 取得日時: {earliest_this_week_ts}) のスナップショットは確定済みのため、"
+                f"数値変動を防ぐため再取得をスキップして月曜時点のデータを維持します。"
+            )
+        return True
+
+    # Git未コミットだがローカルに今週分がある場合も保護
+    if LATEST_SNAPSHOT.exists() and not force_refresh:
+        try:
+            with open(LATEST_SNAPSHOT, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and len(data) >= 5:
+                updated_str = data[0].get("updated_at", "")
+                last_monday_str = get_monday_date_str(updated_str)
+                if last_monday_str == now_monday_str:
+                    print(f"[LOCKED] 同一週 ({now_monday_str}週) のスナップショットが既に存在するため、再取得をスキップします。")
+                    return True
+                elif last_monday_str and last_monday_str < now_monday_str:
+                    PREV_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(LATEST_SNAPSHOT, PREV_SNAPSHOT)
+                    print(f"前週のスナップショット ({last_monday_str}週) を prev_monday.json にローテーションしました。")
+        except Exception as e:
+            print(f"Snapshot rotation check skipped: {e}")
+
+    return False
 
 
 def fetch_youtube_stats_batch(youtube_ids: list, api_key: str) -> dict:
@@ -180,32 +295,17 @@ def pick_earliest_iso(dt_str1: str, dt_str2: str, dt_str3: str = "") -> str:
 
 
 def main():
+    force_refresh = "--force" in sys.argv
+    if restore_and_lock_monday_snapshot_if_same_week(force_refresh=force_refresh):
+        return
+
     api_key = os.environ.get("YOUTUBE_API_KEY")
     if not api_key:
         print("エラー: YOUTUBE_API_KEY が設定されていません。")
         return
 
-    rotate_snapshots_if_needed()
-
     with open(MASTER_FILE, "r", encoding="utf-8") as f:
         songs = json.load(f)
-
-    # 前週のスナップショットを読み込み、前週すでに計測されていた曲かどうかを判定できるようにする
-    prev_yt_ids = set()
-    prev_nc_ids = set()
-    if PREV_SNAPSHOT.exists():
-        try:
-            with open(PREV_SNAPSHOT, "r", encoding="utf-8") as pf:
-                prev_data = json.load(pf)
-            if isinstance(prev_data, list):
-                for p_item in prev_data:
-                    if isinstance(p_item, dict):
-                        if p_item.get("youtube_id"):
-                            prev_yt_ids.add(p_item["youtube_id"])
-                        if p_item.get("niconico_id"):
-                            prev_nc_ids.add(p_item["niconico_id"])
-        except Exception:
-            pass
 
     yt_ids = [s.get("youtube_id") for s in songs if s.get("youtube_id")]
     nc_ids = [s.get("niconico_id") for s in songs if s.get("niconico_id")]

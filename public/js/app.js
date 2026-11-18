@@ -1,62 +1,21 @@
+import {
+  OFFICIAL_SITE_URL,
+  SITE_ANNOUNCEMENT_MESSAGE,
+  COUNTER_NAMESPACE,
+  COUNTER_KEY,
+  MILESTONE_THRESHOLDS,
+  FAVORITES_STORAGE_KEY,
+  LAST_KNOWN_CHART_STORAGE_KEY,
+  ARCHIVE_HISTORY_SESSION_KEY,
+  MOBILE_MEDIA_QUERY,
+  WEIGHTS,
+  METRIC_COLORS,
+  DEFAULT_PAGE_TITLE,
+  DEFAULT_META_DESC,
+  state
+} from "./config-state.js";
+
 window.__VOCALOID_APP_LOADED__ = true;
-
-/**
- * 運営者用設定：
- * シェア時に使用する公式公開URL（.pages.dev が外部に出ないよう固定）
- */
-const OFFICIAL_SITE_URL = "https://weekly-vocaloid-combined-chart.com";
-
-/**
- * 任意の感謝メッセージ（「1,000,000 view ありがとうございます！」など）を常時表示したい場合は
- * 下記の SITE_ANNOUNCEMENT_MESSAGE にテキストを入力してください。
- */
-const SITE_ANNOUNCEMENT_MESSAGE = "";
-const COUNTER_NAMESPACE = "vocaloid-combined-chart";
-const COUNTER_KEY = "total-site-views";
-const MILESTONE_THRESHOLDS = [1000000, 500000, 100000, 50000, 10000, 5000, 1000];
-
-let insightChartInstance = null;
-let currentChartData = null;
-let archiveHistoryCache = [];
-let archiveHistoryLoaded = false;
-let chartJsLoadingPromise = null;
-const inflightJsonRequests = new Map();
-
-// ランキング用 フィルタ・ソート・お気に入り状態
-let currentSearchQuery = "";
-let currentSortMode = "rank";
-let showFavoritesOnly = false;
-let favoriteSongKeys = new Set();
-
-// 記事・コラム用 状態管理
-let allArticlesData = [];
-let currentArticleCategory = "all";
-let currentArticleSearchQuery = "";
-let currentOpenArticleId = null;
-
-const FAVORITES_STORAGE_KEY = "vcc_favorite_songs_v1";
-const LAST_KNOWN_CHART_STORAGE_KEY = "vcc_latest_chart_cache_v1";
-const ARCHIVE_HISTORY_SESSION_KEY = "vcc_archive_history_session_v1";
-const MOBILE_MEDIA_QUERY = "(max-width: 640px)";
-
-const WEIGHTS = {
-  yt_views: 1,
-  yt_likes: 50,
-  yt_comments: 100,
-  nc_views: 5,
-  nc_mylist: 100,
-  nc_mylists: 100,
-  nc_comments: 10
-};
-
-const METRIC_COLORS = {
-  yt_views: "#ef4444",    // 赤: YouTube再生
-  yt_likes: "#f97316",    // 橙: YouTube高評価
-  yt_comments: "#eab308", // 黄: YouTubeコメント
-  nc_views: "#3b82f6",    // 青: ニコ動再生
-  nc_mylists: "#06b6d4",  // 水色: ニコ動マイリスト
-  nc_comments: "#8b5cf6"  // 紫: ニコ動コメント
-};
 
 function escapeHtml(str) {
   if (str === null || str === undefined) return "";
@@ -127,10 +86,10 @@ function ensureChartJsLoaded() {
   if (typeof Chart !== "undefined") {
     return Promise.resolve(true);
   }
-  if (chartJsLoadingPromise) {
-    return chartJsLoadingPromise;
+  if (state.chartJsLoadingPromise) {
+    return state.chartJsLoadingPromise;
   }
-  chartJsLoadingPromise = new Promise(function (resolve) {
+  state.chartJsLoadingPromise = new Promise(function (resolve) {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js";
     script.crossOrigin = "anonymous";
@@ -140,12 +99,12 @@ function ensureChartJsLoaded() {
       resolve(true);
     };
     script.onerror = function () {
-      chartJsLoadingPromise = null;
+      state.chartJsLoadingPromise = null;
       resolve(false);
     };
     document.head.appendChild(script);
   });
-  return chartJsLoadingPromise;
+  return state.chartJsLoadingPromise;
 }
 
 function sanitizeYoutubeId(rawId) {
@@ -222,8 +181,8 @@ async function fetchJsonSingleUrl(url, cacheMode, timeoutMs, maxRetries) {
   const retries = maxRetries !== undefined ? maxRetries : 2;
   const requestKey = mode + "::" + url;
 
-  if (inflightJsonRequests.has(requestKey)) {
-    return inflightJsonRequests.get(requestKey);
+  if (state.inflightJsonRequests.has(requestKey)) {
+    return state.inflightJsonRequests.get(requestKey);
   }
 
   const task = (async function () {
@@ -260,11 +219,11 @@ async function fetchJsonSingleUrl(url, cacheMode, timeoutMs, maxRetries) {
     return null;
   })();
 
-  inflightJsonRequests.set(requestKey, task);
+  state.inflightJsonRequests.set(requestKey, task);
   try {
     return await task;
   } finally {
-    inflightJsonRequests.delete(requestKey);
+    state.inflightJsonRequests.delete(requestKey);
   }
 }
 
@@ -375,8 +334,8 @@ function checkAndShowMilestoneBanner(views) {
   const bannerTextEl = document.getElementById("milestone-text");
   if (!bannerEl || !bannerTextEl) return;
 
-  if (currentChartData && currentChartData.milestone_message) {
-    bannerTextEl.textContent = currentChartData.milestone_message;
+  if (state.currentChartData && state.currentChartData.milestone_message) {
+    bannerTextEl.textContent = state.currentChartData.milestone_message;
     bannerEl.style.display = "block";
     return;
   }
@@ -403,18 +362,18 @@ function loadFavoritesFromStorage() {
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
-        favoriteSongKeys = new Set(arr);
+        state.favoriteSongKeys = new Set(arr);
       }
     }
   } catch (_) {
-    favoriteSongKeys = new Set();
+    state.favoriteSongKeys = new Set();
   }
   updateFavCountBadge();
 }
 
 function saveFavoritesToStorage() {
   try {
-    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favoriteSongKeys)));
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(state.favoriteSongKeys)));
   } catch (_) {
     // ignore storage quota errors
   }
@@ -434,21 +393,21 @@ function getPrimarySongKey(song) {
 
 function isSongFavorited(song) {
   const key = getPrimarySongKey(song);
-  return key ? favoriteSongKeys.has(key) : false;
+  return key ? state.favoriteSongKeys.has(key) : false;
 }
 
 function toggleFavoriteSong(songKey) {
   if (!songKey) return;
-  if (favoriteSongKeys.has(songKey)) {
-    favoriteSongKeys.delete(songKey);
+  if (state.favoriteSongKeys.has(songKey)) {
+    state.favoriteSongKeys.delete(songKey);
     showToast("お気に入りから解除しました");
   } else {
-    favoriteSongKeys.add(songKey);
+    state.favoriteSongKeys.add(songKey);
     showToast("★ お気に入りに保存しました");
   }
   saveFavoritesToStorage();
-  if (currentChartData) {
-    renderRankingView(getSongsArray(currentChartData));
+  if (state.currentChartData) {
+    renderRankingView(getSongsArray(state.currentChartData));
   }
 }
 
@@ -456,11 +415,11 @@ function updateFavCountBadge() {
   const countSpan = document.getElementById("fav-count-num");
   const favBtn = document.getElementById("fav-filter-btn");
   if (countSpan) {
-    countSpan.textContent = String(favoriteSongKeys.size);
+    countSpan.textContent = String(state.favoriteSongKeys.size);
   }
   if (favBtn) {
-    favBtn.classList.toggle("active", showFavoritesOnly);
-    favBtn.setAttribute("aria-pressed", showFavoritesOnly ? "true" : "false");
+    favBtn.classList.toggle("active", state.showFavoritesOnly);
+    favBtn.setAttribute("aria-pressed", state.showFavoritesOnly ? "true" : "false");
   }
 }
 
@@ -477,35 +436,35 @@ function initUtilityToolbar() {
 
   if (searchInput) {
     searchInput.addEventListener("input", function (e) {
-      currentSearchQuery = (e.target.value || "").trim().toLowerCase();
-      if (currentChartData) {
-        renderRankingView(getSongsArray(currentChartData));
+      state.currentSearchQuery = (e.target.value || "").trim().toLowerCase();
+      if (state.currentChartData) {
+        renderRankingView(getSongsArray(state.currentChartData));
       }
     });
   }
 
   if (sortSelect) {
     sortSelect.addEventListener("change", function (e) {
-      currentSortMode = e.target.value || "rank";
-      if (currentChartData) {
-        renderRankingView(getSongsArray(currentChartData));
+      state.currentSortMode = e.target.value || "rank";
+      if (state.currentChartData) {
+        renderRankingView(getSongsArray(state.currentChartData));
       }
     });
   }
 
   if (favFilterBtn) {
     favFilterBtn.addEventListener("click", function () {
-      showFavoritesOnly = !showFavoritesOnly;
+      state.showFavoritesOnly = !state.showFavoritesOnly;
       updateFavCountBadge();
-      if (currentChartData) {
-        renderRankingView(getSongsArray(currentChartData));
+      if (state.currentChartData) {
+        renderRankingView(getSongsArray(state.currentChartData));
       }
     });
   }
 
   if (ytPlaylistBtn) {
     ytPlaylistBtn.addEventListener("click", function () {
-      const songs = getSongsArray(currentChartData);
+      const songs = getSongsArray(state.currentChartData);
       const ytIds = songs
         .slice(0, 20)
         .map(function (s) {
@@ -548,11 +507,11 @@ function initUtilityToolbar() {
 }
 
 function buildChartSummaryText() {
-  if (!currentChartData) {
+  if (!state.currentChartData) {
     return "週刊VOCALOID™複合ランキング TOP 20 #週刊VOCALOID複合ランキング #vocanew #ボカロ";
   }
-  const period = normalizePeriodString(currentChartData.period || "");
-  const top3 = getSongsArray(currentChartData).slice(0, 3);
+  const period = normalizePeriodString(state.currentChartData.period || "");
+  const top3 = getSongsArray(state.currentChartData).slice(0, 3);
   const lines = top3.map(function (s, i) {
     return (
       i +
@@ -680,11 +639,11 @@ function activateTabById(targetId) {
     c.classList.toggle("active", c.id === targetId);
   });
 
-  if (targetId === "tab-insight" && currentChartData) {
+  if (targetId === "tab-insight" && state.currentChartData) {
     ensureChartJsLoaded().then(function () {
       requestAnimationFrame(function () {
         setTimeout(function () {
-          renderTop10InsightChart(getSongsArray(currentChartData));
+          renderTop10InsightChart(getSongsArray(state.currentChartData));
           refreshAllScrollHints();
         }, 20);
       });
@@ -871,24 +830,22 @@ async function initChartApp() {
   await loadAndRenderChart();
 
   try {
-    const songs = getSongsArray(currentChartData);
+    const songs = getSongsArray(state.currentChartData);
     const needsHistoryEnrich = songs.some(function (s) {
       return typeof s.chart_in_count !== "number" || s.chart_in_count < 1;
     });
 
     if (needsHistoryEnrich) {
       await ensureFullArchiveHistoryLoaded();
-      if (currentChartData) {
-        enrichWithHistory(currentChartData);
-        renderAllViews(currentChartData);
+      if (state.currentChartData) {
+        enrichWithHistory(state.currentChartData);
+        renderAllViews(state.currentChartData);
       }
     }
   } catch (err) {
     console.warn("アーカイブ履歴の補完をスキップしました:", err);
   }
 }
-
-let cachedArchiveListMeta = [];
 
 async function loadArchiveIndexOnly() {
   const indexData = await fetchJsonWithFallback(
@@ -917,7 +874,7 @@ async function loadArchiveIndexOnly() {
     return isChartReleasedForPublic(item);
   });
 
-  cachedArchiveListMeta = archiveList;
+  state.cachedArchiveListMeta = archiveList;
   if (!archiveList.length) {
     return;
   }
@@ -968,7 +925,7 @@ async function loadArchiveIndexOnly() {
             await ensureFullArchiveHistoryLoaded();
             enrichWithHistory(archiveData);
           }
-          currentChartData = archiveData;
+          state.currentChartData = archiveData;
           renderAllViews(archiveData);
         }
       }
@@ -977,15 +934,15 @@ async function loadArchiveIndexOnly() {
 }
 
 async function ensureFullArchiveHistoryLoaded() {
-  if (archiveHistoryLoaded || !cachedArchiveListMeta.length) return;
-  archiveHistoryLoaded = true;
+  if (state.archiveHistoryLoaded || !state.cachedArchiveListMeta.length) return;
+  state.archiveHistoryLoaded = true;
 
   try {
     const cachedRaw = sessionStorage.getItem(ARCHIVE_HISTORY_SESSION_KEY);
     if (cachedRaw) {
       const parsed = JSON.parse(cachedRaw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        archiveHistoryCache = parsed;
+        state.archiveHistoryCache = parsed;
         return;
       }
     }
@@ -994,8 +951,8 @@ async function ensureFullArchiveHistoryLoaded() {
   }
 
   const loadedArchives = [];
-  for (let i = 0; i < cachedArchiveListMeta.length; i++) {
-    const item = cachedArchiveListMeta[i];
+  for (let i = 0; i < state.cachedArchiveListMeta.length; i++) {
+    const item = state.cachedArchiveListMeta[i];
     const rawFile =
       typeof item === "string"
         ? item
@@ -1010,7 +967,7 @@ async function ensureFullArchiveHistoryLoaded() {
       loadedArchives.push(data);
     }
   }
-  archiveHistoryCache = loadedArchives;
+  state.archiveHistoryCache = loadedArchives;
 
   try {
     sessionStorage.setItem(ARCHIVE_HISTORY_SESSION_KEY, JSON.stringify(loadedArchives));
@@ -1021,12 +978,12 @@ async function ensureFullArchiveHistoryLoaded() {
 
 function enrichWithHistory(chartData) {
   const songs = getSongsArray(chartData);
-  if (!songs.length || !archiveHistoryCache.length) return;
+  if (!songs.length || !state.archiveHistoryCache.length) return;
 
   const targetKey =
     chartData.archiveId || chartData.publishDate || chartData.period || chartData.updated_at || "";
 
-  const olderCharts = archiveHistoryCache.filter(function (c) {
+  const olderCharts = state.archiveHistoryCache.filter(function (c) {
     const p = c.archiveId || c.publishDate || c.period || c.updated_at || "";
     return p && targetKey ? p < targetKey : false;
   });
@@ -1075,8 +1032,8 @@ function enrichWithHistory(chartData) {
 }
 
 async function loadLatestReleasedArchiveFallback() {
-  for (let i = 0; i < cachedArchiveListMeta.length; i++) {
-    const item = cachedArchiveListMeta[i];
+  for (let i = 0; i < state.cachedArchiveListMeta.length; i++) {
+    const item = state.cachedArchiveListMeta[i];
     const rawFile =
       typeof item === "string"
         ? item
@@ -1149,7 +1106,7 @@ async function loadAndRenderChart() {
   }
 
   enrichWithHistory(data);
-  currentChartData = data;
+  state.currentChartData = data;
   renderAllViews(data);
 }
 
@@ -1307,34 +1264,34 @@ function getFilteredAndSortedSongs(ranking) {
     });
   });
 
-  if (showFavoritesOnly) {
+  if (state.showFavoritesOnly) {
     list = list.filter(function (s) {
       return isSongFavorited(s);
     });
   }
 
-  if (currentSearchQuery) {
+  if (state.currentSearchQuery) {
     list = list.filter(function (s) {
       const hay = ((s.title || "") + " " + (s.producer || "") + " " + (s.vocal || "")).toLowerCase();
-      return hay.indexOf(currentSearchQuery) !== -1;
+      return hay.indexOf(state.currentSearchQuery) !== -1;
     });
   }
 
-  if (currentSortMode === "pt_ratio") {
+  if (state.currentSortMode === "pt_ratio") {
     list.sort(function (a, b) {
       return (b.pt_ratio || 0) - (a.pt_ratio || 0);
     });
-  } else if (currentSortMode === "chart_in") {
+  } else if (state.currentSortMode === "chart_in") {
     list.sort(function (a, b) {
       return (b.chart_in_count || 1) - (a.chart_in_count || 1);
     });
-  } else if (currentSortMode === "yt_share") {
+  } else if (state.currentSortMode === "yt_share") {
     list.sort(function (a, b) {
       const ba = getPointsBreakdown(a);
       const bb = getPointsBreakdown(b);
       return bb.yt_total / bb.calcSum - ba.yt_total / ba.calcSum;
     });
-  } else if (currentSortMode === "nc_share") {
+  } else if (state.currentSortMode === "nc_share") {
     list.sort(function (a, b) {
       const ba = getPointsBreakdown(a);
       const bb = getPointsBreakdown(b);
@@ -1666,14 +1623,14 @@ function renderTop10InsightChart(ranking) {
       canvas = document.getElementById("top5Chart");
     }
 
-    if (insightChartInstance) {
-      insightChartInstance.destroy();
-      insightChartInstance = null;
+    if (state.insightChartInstance) {
+      state.insightChartInstance.destroy();
+      state.insightChartInstance = null;
     }
 
     try {
       const ctx = canvas.getContext("2d");
-      insightChartInstance = new Chart(ctx, {
+      state.insightChartInstance = new Chart(ctx, {
         type: "bar",
         data: {
           labels: labels,
@@ -1769,7 +1726,7 @@ function renderTop10InsightChart(ranking) {
           }
         }
       });
-      insightChartInstance.resize();
+      state.insightChartInstance.resize();
       return;
     } catch (err) {
       console.warn("Chart.js 描画エラーのため HTML フォールバックを使用します:", err);
@@ -2051,14 +2008,6 @@ function ensureArticlesTabStructure() {
   return sectionEl;
 }
 
-let articlesDataLoaded = false;
-let articlesLoadingPromise = null;
-const DEFAULT_PAGE_TITLE = document.title || "週刊VOCALOID™複合ランキング";
-const DEFAULT_META_DESC = (function () {
-  const el = document.querySelector('meta[name="description"]');
-  return el ? el.getAttribute("content") || "" : "";
-})();
-
 function updatePageSeoMeta(article) {
   const descEl = document.querySelector('meta[name="description"]');
   const ogTitleEl = document.querySelector('meta[property="og:title"]');
@@ -2091,13 +2040,13 @@ function updatePageSeoMeta(article) {
 }
 
 async function ensureArticlesLoaded() {
-  if (articlesDataLoaded) return;
-  if (articlesLoadingPromise) return articlesLoadingPromise;
-  articlesLoadingPromise = loadArticlesData().finally(function () {
-    articlesDataLoaded = true;
-    articlesLoadingPromise = null;
+  if (state.articlesDataLoaded) return;
+  if (state.articlesLoadingPromise) return state.articlesLoadingPromise;
+  state.articlesLoadingPromise = loadArticlesData().finally(function () {
+    state.articlesDataLoaded = true;
+    state.articlesLoadingPromise = null;
   });
-  return articlesLoadingPromise;
+  return state.articlesLoadingPromise;
 }
 
 async function initArticlesSystem() {
@@ -2126,13 +2075,13 @@ async function initArticlesSystem() {
     );
     if (catBtn && catBtn.hasAttribute("data-category")) {
       const cat = catBtn.getAttribute("data-category") || "all";
-      currentArticleCategory = cat;
+      state.currentArticleCategory = cat;
       sectionEl
         .querySelectorAll(".article-cat-btn, .category-pill, .column-cat-btn, [data-category]")
         .forEach(function (b) {
           b.classList.toggle("active", b.getAttribute("data-category") === cat);
         });
-      if (currentOpenArticleId) {
+      if (state.currentOpenArticleId) {
         closeArticleDetail(false);
       }
       renderArticlesView();
@@ -2216,8 +2165,8 @@ async function initArticlesSystem() {
     sectionEl.querySelector('input[type="search"]');
   if (searchInput) {
     searchInput.addEventListener("input", function (e) {
-      currentArticleSearchQuery = (e.target.value || "").trim().toLowerCase();
-      if (currentOpenArticleId) {
+      state.currentArticleSearchQuery = (e.target.value || "").trim().toLowerCase();
+      if (state.currentOpenArticleId) {
         closeArticleDetail(false);
       }
       renderArticlesView();
@@ -2277,11 +2226,11 @@ async function loadArticlesData() {
     list = rawData.articles;
   }
 
-  allArticlesData = list.filter(function (a) {
+  state.allArticlesData = list.filter(function (a) {
     return isArticleReleasedForPublic(a);
   });
 
-  allArticlesData.sort(function (a, b) {
+  state.allArticlesData.sort(function (a, b) {
     const da = String(a.publishedAt || a.publishAt || a.updatedAt || "");
     const db = String(b.publishedAt || b.publishAt || b.updatedAt || "");
     return db.localeCompare(da);
@@ -2301,8 +2250,8 @@ function checkAndHandleArticleHash() {
     }
   } else if (hash === "#" + getArticlesTabId()) {
     activateTabById(getArticlesTabId());
-    if (currentOpenArticleId) closeArticleDetail(false);
-  } else if (currentOpenArticleId) {
+    if (state.currentOpenArticleId) closeArticleDetail(false);
+  } else if (state.currentOpenArticleId) {
     closeArticleDetail(false);
   }
 }
@@ -2330,11 +2279,11 @@ function formatArticleDate(article) {
 }
 
 function getFilteredArticles() {
-  return allArticlesData.filter(function (a) {
-    if (currentArticleCategory !== "all") {
-      if ((a.category || "") !== currentArticleCategory) return false;
+  return state.allArticlesData.filter(function (a) {
+    if (state.currentArticleCategory !== "all") {
+      if ((a.category || "") !== state.currentArticleCategory) return false;
     }
-    if (currentArticleSearchQuery) {
+    if (state.currentArticleSearchQuery) {
       const tagsStr = Array.isArray(a.tags) ? a.tags.join(" ") : String(a.tags || "");
       const hay = (
         (a.title || "") +
@@ -2347,7 +2296,7 @@ function getFilteredArticles() {
         " " +
         (a.author || "")
       ).toLowerCase();
-      if (hay.indexOf(currentArticleSearchQuery) === -1) return false;
+      if (hay.indexOf(state.currentArticleSearchQuery) === -1) return false;
     }
     return true;
   });
@@ -2488,7 +2437,7 @@ function renderArticlesView() {
 
   if (!gridContainer) return;
 
-  if (!allArticlesData.length) {
+  if (!state.allArticlesData.length) {
     if (featuredContainer) featuredContainer.innerHTML = "";
     if (emptyStateEl) {
       emptyStateEl.style.display = "block";
@@ -2519,7 +2468,7 @@ function renderArticlesView() {
     return;
   }
 
-  const showHero = currentArticleCategory === "all" && !currentArticleSearchQuery;
+  const showHero = state.currentArticleCategory === "all" && !state.currentArticleSearchQuery;
   const heroArticle = showHero
     ? filtered.find(function (a) {
         return Boolean(a.featured);
@@ -2547,7 +2496,7 @@ function renderArticlesView() {
 
 async function openArticleById(articleId, updateHash) {
   await ensureArticlesLoaded();
-  let article = allArticlesData.find(function (a) {
+  let article = state.allArticlesData.find(function (a) {
     return String(a.id) === String(articleId);
   });
   if (!article) {
@@ -2578,7 +2527,7 @@ async function openArticleById(articleId, updateHash) {
     }
   }
 
-  currentOpenArticleId = article.id;
+  state.currentOpenArticleId = article.id;
   if (updateHash) {
     history.pushState(null, "", "#article=" + encodeURIComponent(article.id));
   }
@@ -2607,7 +2556,7 @@ async function openArticleById(articleId, updateHash) {
   const dateStr = formatArticleDate(article);
   const tags = Array.isArray(article.tags) ? article.tags : [];
   const bodyHtml = parseArticleBodyHtml(article.body || article.content || "");
-  const related = allArticlesData
+  const related = state.allArticlesData
     .filter(function (a) {
       return a.id !== article.id;
     })
@@ -2706,7 +2655,7 @@ async function openArticleById(articleId, updateHash) {
 }
 
 function closeArticleDetail(clearHash) {
-  currentOpenArticleId = null;
+  state.currentOpenArticleId = null;
   updatePageSeoMeta(null);
   if (clearHash && window.location.hash.indexOf("#article=") === 0) {
     history.pushState(null, "", window.location.pathname + window.location.search);
