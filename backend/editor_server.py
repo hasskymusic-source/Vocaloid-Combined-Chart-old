@@ -6,7 +6,7 @@ import webbrowser
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from config import BASE_DIR, DRAFT_FILE, PUBLIC_LATEST
+from config import BASE_DIR, DRAFT_FILE, PUBLIC_LATEST, normalize_preview_path, resolve_js_module_path
 from export_blog import generate_markdown_from_data, export_markdown_file
 from publish_chart import main as publish_to_public_site, get_release_datetime_jst, is_chart_released
 from build_draft import generate_private_owner_report
@@ -622,7 +622,7 @@ class EditorHandler(BaseHTTPRequestHandler):
         self.wfile.write(file_path.read_bytes())
 
     def do_GET(self):
-        clean_path = self.path.split("?")[0]
+        clean_path = normalize_preview_path(self.path.split("?")[0])
 
         if clean_path == "/" or clean_path == "/index":
             self.send_response(200)
@@ -644,11 +644,19 @@ class EditorHandler(BaseHTTPRequestHandler):
                 css_file = BASE_DIR / "public" / "style.css"
             self._serve_static_file(css_file, "text/css; charset=utf-8")
 
-        elif clean_path in ("/app.js", "/js/app.js"):
+        elif clean_path == "/app.js":
             js_file = BASE_DIR / "app.js"
             if not js_file.exists():
                 js_file = BASE_DIR / "public" / "app.js"
             self._serve_static_file(js_file, "application/javascript; charset=utf-8")
+
+        elif clean_path.startswith("/js/") and clean_path.endswith(".js"):
+            target_js = resolve_js_module_path(clean_path)
+            if target_js:
+                self._serve_static_file(target_js, "application/javascript; charset=utf-8")
+            else:
+                self.send_response(404)
+                self.end_headers()
 
         elif clean_path.startswith("/data/") or clean_path.startswith("/public/data/"):
             # 手元プレビュー時に latest_ranking.json がリクエストされたら、最新の weekly_draft.json を返す

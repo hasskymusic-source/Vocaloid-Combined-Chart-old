@@ -40,3 +40,23 @@ PUBLIC_LATEST = PUBLIC_DATA_DIR / "latest_ranking.json"
 PUBLIC_ARTICLES_FILE = PUBLIC_DATA_DIR / "articles.json"
 ARCHIVE_DIR = PUBLIC_DATA_DIR / "archives"
 ARCHIVE_INDEX = ARCHIVE_DIR / "archive_index.json"
+
+
+def normalize_preview_path(clean_path: str) -> str:
+    """/preview/ 配下の相対アセット参照をルート相対パスへ正規化する"""
+    if clean_path.startswith("/preview/") and clean_path != "/preview/":
+        return clean_path[len("/preview"):]
+    return clean_path
+
+
+def resolve_js_module_path(clean_path: str):
+    """/js/*.js リクエストをトラバーサル検証付きでローカルのJSモジュール実体へ解決する"""
+    if not clean_path.startswith("/js/") or not clean_path.endswith(".js"):
+        return None
+    rel_path = clean_path.lstrip("/")
+    for root_dir in (BASE_DIR, BASE_DIR / "public"):
+        js_root = (root_dir / "js").resolve()
+        candidate = (root_dir / rel_path).resolve()
+        if js_root in candidate.parents and candidate.exists() and candidate.is_file():
+            return candidate
+    return None

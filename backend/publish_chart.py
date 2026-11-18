@@ -66,6 +66,9 @@ CLOUDFLARE_HEADERS_CONTENT = """/*
 /js/app.js
   Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=86400
 
+/js/*
+  Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=86400
+
 /style.css
   Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=86400
 
@@ -632,17 +635,11 @@ def sync_frontend_assets():
             PROJECT_ROOT / "public/css/style.css",
             PROJECT_ROOT / "style.css",
         ],
-        "app.js": [
-            PROJECT_ROOT / "public/app.js",
-            PROJECT_ROOT / "public/js/app.js",
-            PROJECT_ROOT / "app.js",
-        ],
     }
 
     public_targets = {
         "index.html": [PROJECT_ROOT / "public/index.html"],
         "style.css": [PROJECT_ROOT / "public/style.css", PROJECT_ROOT / "public/css/style.css"],
-        "app.js": [PROJECT_ROOT / "public/app.js", PROJECT_ROOT / "public/js/app.js"],
     }
 
     for name, candidates in asset_groups.items():
@@ -660,6 +657,23 @@ def sync_frontend_assets():
         except Exception as e:
             print(f"[WARN] {name} の同期中に警告: {e}")
             raise
+
+    # public/js/ 配下のES Modules群（app.jsおよび分割モジュール）を検証・サニタイズ
+    # ※ 旧ミラー public/app.js との相互上書きは ES Modules 構成を破壊するため行わない
+    js_dir = PROJECT_ROOT / "public/js"
+    if js_dir.exists() and js_dir.is_dir():
+        for js_path in sorted(js_dir.glob("*.js")):
+            if not js_path.is_file() or js_path.stat().st_size == 0:
+                continue
+            try:
+                raw_content = js_path.read_text(encoding="utf-8")
+                clean_content = sanitize_frontend_content(raw_content, filename=js_path.name)
+                if clean_content != raw_content:
+                    js_path.write_text(clean_content, encoding="utf-8")
+                print(f"[SYNC & SECURE] js/{js_path.name} を検証しました")
+            except Exception as e:
+                print(f"[WARN] js/{js_path.name} の検証中に警告: {e}")
+                raise
 
     for headers_target in (PROJECT_ROOT / "_headers", PROJECT_ROOT / "public/_headers"):
         headers_target.parent.mkdir(parents=True, exist_ok=True)

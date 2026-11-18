@@ -12,6 +12,8 @@ from config import (
     ARTICLES_MASTER_FILE,
     ARTICLES_BACKUP_FILE,
     PUBLIC_ARTICLES_FILE,
+    normalize_preview_path,
+    resolve_js_module_path,
 )
 from publish_chart import sync_published_articles, sync_frontend_assets
 
@@ -819,7 +821,7 @@ class ColumnStudioHandler(BaseHTTPRequestHandler):
         self.wfile.write(path.read_bytes())
 
     def do_GET(self):
-        clean_path = self.path.split("?")[0]
+        clean_path = normalize_preview_path(self.path.split("?")[0])
 
         if clean_path == "/" or clean_path == "/index":
             self.send_response(200)
@@ -840,11 +842,19 @@ class ColumnStudioHandler(BaseHTTPRequestHandler):
                 css_file = BASE_DIR / "public" / "style.css"
             self._serve_file(css_file, "text/css; charset=utf-8")
 
-        elif clean_path in ("/app.js", "/js/app.js"):
+        elif clean_path == "/app.js":
             js_file = BASE_DIR / "app.js"
             if not js_file.exists():
                 js_file = BASE_DIR / "public" / "app.js"
             self._serve_file(js_file, "application/javascript; charset=utf-8")
+
+        elif clean_path.startswith("/js/") and clean_path.endswith(".js"):
+            target_js = resolve_js_module_path(clean_path)
+            if target_js:
+                self._serve_file(target_js, "application/javascript; charset=utf-8")
+            else:
+                self.send_response(404)
+                self.end_headers()
 
         elif clean_path.startswith("/data/") or clean_path.startswith("/public/data/"):
             rel = clean_path.lstrip("/")
