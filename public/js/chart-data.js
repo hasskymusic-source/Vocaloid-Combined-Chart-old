@@ -148,7 +148,7 @@ export async function ensureFullArchiveHistoryLoaded() {
     const cachedRaw = sessionStorage.getItem(ARCHIVE_HISTORY_SESSION_KEY);
     if (cachedRaw) {
       const parsed = JSON.parse(cachedRaw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.length >= state.cachedArchiveListMeta.length) {
         state.archiveHistoryCache = parsed;
         return;
       }
@@ -179,15 +179,23 @@ export async function ensureFullArchiveHistoryLoaded() {
 /** 過去アーカイブ履歴からチャートイン回数・前週ポイント・前週比を補完する */
 export function enrichWithHistory(chartData) {
   const songs = getSongsArray(chartData);
-  if (!songs.length || !state.archiveHistoryCache.length) return;
+  if (!songs.length) return;
 
-  const targetKey =
-    chartData.archiveId || chartData.publishDate || chartData.period || chartData.updated_at || "";
+  const getSortKey = function (c) {
+    return c.archiveId || c.publishDate || c.period || c.updated_at || "";
+  };
+  const targetKey = getSortKey(chartData);
 
-  const olderCharts = state.archiveHistoryCache.filter(function (c) {
-    const p = c.archiveId || c.publishDate || c.period || c.updated_at || "";
-    return p && targetKey ? p < targetKey : false;
-  });
+  const olderCharts = state.archiveHistoryCache
+    .filter(function (c) {
+      const p = getSortKey(c);
+      return p && targetKey ? p < targetKey : false;
+    })
+    .sort(function (a, b) {
+      const ka = getSortKey(a);
+      const kb = getSortKey(b);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
 
   const prevChart = olderCharts.length > 0 ? olderCharts[olderCharts.length - 1] : null;
 
