@@ -1,6 +1,5 @@
 import {
   OFFICIAL_SITE_URL,
-  FAVORITES_STORAGE_KEY,
   LAST_KNOWN_CHART_STORAGE_KEY,
   ARCHIVE_HISTORY_SESSION_KEY,
   DEFAULT_PAGE_TITLE,
@@ -41,13 +40,23 @@ import {
   renderInsightTable,
   renderCommentaryView
 } from "./insight-view.js";
+import {
+  loadFavoritesFromStorage,
+  isSongFavorited,
+  toggleFavoriteSong,
+  initUtilityToolbar
+} from "./favorites-toolbar.js";
 
 window.__VOCALOID_APP_LOADED__ = true;
 
 function startApp() {
   loadFavoritesFromStorage();
   initTabs();
-  initUtilityToolbar();
+  initUtilityToolbar(function () {
+    if (state.currentChartData) {
+      renderRankingView(getSongsArray(state.currentChartData));
+    }
+  });
   initRankingEventDelegation();
   initScrollHints();
   initBackToTopButton();
@@ -71,176 +80,6 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", startApp);
 } else {
   startApp();
-}
-
-/**
- * 2. お気に入り（ローカルブックマーク）管理システム
- */
-function loadFavoritesFromStorage() {
-  try {
-    const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) {
-        state.favoriteSongKeys = new Set(arr);
-      }
-    }
-  } catch (_) {
-    state.favoriteSongKeys = new Set();
-  }
-  updateFavCountBadge();
-}
-
-function saveFavoritesToStorage() {
-  try {
-    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(state.favoriteSongKeys)));
-  } catch (_) {
-    // ignore storage quota errors
-  }
-  updateFavCountBadge();
-}
-
-function isSongFavorited(song) {
-  const key = getPrimarySongKey(song);
-  return key ? state.favoriteSongKeys.has(key) : false;
-}
-
-function toggleFavoriteSong(songKey) {
-  if (!songKey) return;
-  if (state.favoriteSongKeys.has(songKey)) {
-    state.favoriteSongKeys.delete(songKey);
-    showToast("お気に入りから解除しました");
-  } else {
-    state.favoriteSongKeys.add(songKey);
-    showToast("★ お気に入りに保存しました");
-  }
-  saveFavoritesToStorage();
-  if (state.currentChartData) {
-    renderRankingView(getSongsArray(state.currentChartData));
-  }
-}
-
-function updateFavCountBadge() {
-  const countSpan = document.getElementById("fav-count-num");
-  const favBtn = document.getElementById("fav-filter-btn");
-  if (countSpan) {
-    countSpan.textContent = String(state.favoriteSongKeys.size);
-  }
-  if (favBtn) {
-    favBtn.classList.toggle("active", state.showFavoritesOnly);
-    favBtn.setAttribute("aria-pressed", state.showFavoritesOnly ? "true" : "false");
-  }
-}
-
-/**
- * 3. 検索・ソート・YouTube連続再生・SNSシェアの便利ツールバー初期化
- */
-function initUtilityToolbar() {
-  const searchInput = document.getElementById("ranking-search-input");
-  const sortSelect = document.getElementById("ranking-sort-select");
-  const favFilterBtn = document.getElementById("fav-filter-btn");
-  const ytPlaylistBtn = document.getElementById("yt-playlist-btn");
-  const shareXBtn = document.getElementById("share-x-btn");
-  const copySummaryBtn = document.getElementById("copy-summary-btn");
-
-  if (searchInput) {
-    searchInput.addEventListener("input", function (e) {
-      state.currentSearchQuery = (e.target.value || "").trim().toLowerCase();
-      if (state.currentChartData) {
-        renderRankingView(getSongsArray(state.currentChartData));
-      }
-    });
-  }
-
-  if (sortSelect) {
-    sortSelect.addEventListener("change", function (e) {
-      state.currentSortMode = e.target.value || "rank";
-      if (state.currentChartData) {
-        renderRankingView(getSongsArray(state.currentChartData));
-      }
-    });
-  }
-
-  if (favFilterBtn) {
-    favFilterBtn.addEventListener("click", function () {
-      state.showFavoritesOnly = !state.showFavoritesOnly;
-      updateFavCountBadge();
-      if (state.currentChartData) {
-        renderRankingView(getSongsArray(state.currentChartData));
-      }
-    });
-  }
-
-  if (ytPlaylistBtn) {
-    ytPlaylistBtn.addEventListener("click", function () {
-      const songs = getSongsArray(state.currentChartData);
-      const ytIds = songs
-        .slice(0, 20)
-        .map(function (s) {
-          return sanitizeYoutubeId(s.youtube_id);
-        })
-        .filter(Boolean);
-
-      if (!ytIds.length) {
-        showToast("再生可能なYouTube動画が見つかりません");
-        return;
-      }
-      const playlistUrl = "https://www.youtube.com/watch_videos?video_ids=" + ytIds.join(",");
-      window.open(playlistUrl, "_blank", "noopener,noreferrer");
-    });
-  }
-
-  if (shareXBtn) {
-    shareXBtn.addEventListener("click", function () {
-      const text = buildChartSummaryText();
-      const shareUrl =
-        "https://twitter.com/intent/tweet?text=" +
-        encodeURIComponent(text) +
-        "&url=" +
-        encodeURIComponent(OFFICIAL_SITE_URL);
-      window.open(shareUrl, "_blank", "noopener,noreferrer");
-    });
-  }
-
-  if (copySummaryBtn) {
-    copySummaryBtn.addEventListener("click", async function () {
-      const text = buildChartSummaryText() + "\n" + OFFICIAL_SITE_URL;
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast("📋 今週のランキング結果をコピーしました！");
-      } catch (_) {
-        showToast("コピーに失敗しました");
-      }
-    });
-  }
-}
-
-function buildChartSummaryText() {
-  if (!state.currentChartData) {
-    return "週刊VOCALOID™複合ランキング TOP 20 #週刊VOCALOID複合ランキング #vocanew #ボカロ";
-  }
-  const period = normalizePeriodString(state.currentChartData.period || "");
-  const top3 = getSongsArray(state.currentChartData).slice(0, 3);
-  const lines = top3.map(function (s, i) {
-    return (
-      i +
-      1 +
-      "位: " +
-      s.title +
-      " / " +
-      s.producer +
-      " (" +
-      Number(s.total_pt || 0).toLocaleString() +
-      " pt)"
-    );
-  });
-  return (
-    "【週刊VOCALOID™複合ランキング】\n集計期間: " +
-    period +
-    "\n\n" +
-    lines.join("\n") +
-    "\n\n#週刊VOCALOID複合ランキング #ボカロ"
-  );
 }
 
 function initRankingEventDelegation() {
