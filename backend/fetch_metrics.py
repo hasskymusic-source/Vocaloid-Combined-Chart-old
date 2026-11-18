@@ -8,8 +8,12 @@ import xml.etree.ElementTree as ET
 import requests
 from datetime import datetime, timedelta, timezone
 from config import BASE_DIR, MASTER_FILE, PREV_SNAPSHOT, LATEST_SNAPSHOT
-from discover_songs import clean_song_title, detect_vocals, search_youtube_id_web_strict
-from googleapiclient.discovery import build
+from discover_songs import search_youtube_id_web_strict
+from vocaloid_filter import build_canonical_originals_map, clean_song_title, detect_vocals, is_eligible_ranking_song
+try:
+    from googleapiclient.discovery import build
+except ImportError:
+    build = None
 
 USER_AGENT = "Mozilla/5.0 (compatible; VocaloidCombinedChartBot/8.2)"
 JST = timezone(timedelta(hours=9))
@@ -306,6 +310,7 @@ def main():
 
     with open(MASTER_FILE, "r", encoding="utf-8") as f:
         songs = json.load(f)
+    canonical_map = build_canonical_originals_map(songs)
 
     yt_ids = [s.get("youtube_id") for s in songs if s.get("youtube_id")]
     nc_ids = [s.get("niconico_id") for s in songs if s.get("niconico_id")]
@@ -381,7 +386,7 @@ def main():
         nc_pub = nc_stats.get("nc_published_at", "")
         earliest_pub = pick_earliest_iso(yt_pub, nc_pub, song.get("published_at", ""))
 
-        snapshots.append({
+        song_entry = {
             "song_id": sid,
             "title": title,
             "producer": producer,
@@ -398,7 +403,10 @@ def main():
             "nc_mylist": nc_mylist,
             "nc_comments": nc_comments,
             "updated_at": now_iso
-        })
+        }
+        if not is_eligible_ranking_song(song_entry, canonical_map):
+            continue
+        snapshots.append(song_entry)
 
     LATEST_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
     with open(LATEST_SNAPSHOT, "w", encoding="utf-8") as f:
