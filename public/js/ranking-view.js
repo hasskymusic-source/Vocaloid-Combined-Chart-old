@@ -238,10 +238,7 @@ export function buildRankCardHtml(song, idx) {
     '<div class="metric-stacked-bar">' + barSegmentsHtml + "</div>" +
     "</div>" +
     '<div class="rank-points-col">' +
-    '<div class="total-points">' +
-    '<span class="total-points-label">総合ポイント数</span>' +
-    '<span class="total-points-value">' + Number(bd.total_pt).toLocaleString() + " <small>pt</small></span>" +
-    "</div>" +
+    '<div class="total-points">' + Number(bd.total_pt).toLocaleString() + " <small>pt</small></div>" +
     '<div class="points-sub-row">' +
     "<span>前週比: " + formatPointRatioHTML(song) + "</span>" +
     '<span class="platform-split-text">YT ' + ytPercent + "% / NC " + ncPercent + "%</span>" +
