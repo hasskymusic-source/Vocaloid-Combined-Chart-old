@@ -4,11 +4,9 @@
   --bg-table-header: #131c31;
   --bg-table-row-hover: #1e293b;
   --border-color: #26334d;
-  --accent-cyan: #3ec6e8;
-  --accent-cyan-muted: #5da9c4;
-  --text-primary: #f1f5f9;
-  --text-secondary: #8898b0;
-  --text-muted: #7d8da6;
+  --accent-cyan: #00d2ff;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
 
   /* 6指標専用カラーパレット */
   --yt-views: #ef4444;    /* 赤: YouTube再生 */
@@ -18,20 +16,15 @@
   --nc-mylists: #06b6d4;  /* 水色: ニコ動マイリス */
   --nc-comments: #8b5cf6; /* 紫: ニコ動コメント */
 
-  --yt-color: #d48484;
-  --nc-color: #7ca6d8;
-  --up-green: #5ec48a;
-  --down-red: #d97b7b;
-  --stay-gray: #7d8da6;
+  --yt-color: #f87171;
+  --nc-color: #60a5fa;
+  --up-green: #4ade80;
+  --down-red: #f87171;
+  --stay-gray: #94a3b8;
 
-  /* 総合ポイント数専用カラー（Billboardフォーマット × ダークモード最適化） */
-  --pt-accent: #d69e2e;
-  --pt-accent-hover: #e3ae3d;
-  --pt-on-accent: #0f172a;
-  --pt-surface: #2e2719;
-  --pt-surface-hover: #38301f;
-  --pt-value: #fde68a;
-  --pt-unit: #d4b46a;
+  /* ランクイン楽曲ポイント強調カラー（シアン基調と調和するクリスタルシアン） */
+  --pt-value: #47e4ff;
+  --pt-unit: #7de0ff;
 }
 
 * {
@@ -126,7 +119,7 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--accent-cyan-muted);
+  color: var(--accent-cyan);
   margin-bottom: 0.25rem;
 }
 
@@ -167,7 +160,7 @@ body {
 .period-value {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #cbd5e1;
+  color: var(--accent-cyan);
 }
 
 .archive-select {
@@ -344,7 +337,7 @@ body {
 .section-title {
   font-size: 1.35rem;
   font-weight: 700;
-  border-left: 4px solid rgba(62, 198, 232, 0.52);
+  border-left: 4px solid var(--accent-cyan);
   padding-left: 0.75rem;
 }
 
@@ -357,7 +350,7 @@ body {
 
 .action-btn {
   background: var(--bg-card);
-  color: #a3b3c9;
+  color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: 2px;
   padding: 0.4rem 0.8rem;
@@ -373,9 +366,9 @@ body {
 }
 
 .yt-playlist-btn {
-  background: rgba(239, 68, 68, 0.07);
-  border-color: rgba(239, 68, 68, 0.26);
-  color: #cf8c8c;
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
 }
 
 .yt-playlist-btn:hover {
@@ -427,7 +420,7 @@ body {
 
 .ranking-sort-select {
   background: #0f172a;
-  color: #cbd5e1;
+  color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: 2px;
   padding: 0.45rem 0.7rem;
@@ -519,12 +512,12 @@ body {
 }
 
 .diff-new {
-  color: var(--accent-cyan-muted);
+  color: var(--accent-cyan);
 }
 
 .chart-in-mini {
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: rgba(148, 163, 184, 0.8);
 }
 
 .rank-thumb-col {
@@ -567,8 +560,8 @@ body {
 
 .fav-star-btn {
   background: transparent;
-  color: var(--text-muted);
-  border: 1px solid rgba(38, 51, 77, 0.85);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 2px;
   padding: 0.1rem 0.45rem;
   font-size: 0.82rem;
@@ -578,15 +571,15 @@ body {
 
 .fav-star-btn.favorited,
 .fav-star-btn:hover {
-  color: #d9b95b;
-  border-color: rgba(217, 185, 91, 0.45);
-  background: rgba(217, 185, 91, 0.08);
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.55);
+  background: rgba(250, 204, 21, 0.1);
 }
 
 .detail-toggle-btn {
   background: rgba(148, 163, 184, 0.06);
-  color: #8fa3bf;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 2px;
   padding: 0.15rem 0.6rem;
   font-size: 0.75rem;
@@ -598,9 +591,9 @@ body {
 
 .detail-toggle-btn:hover,
 .detail-toggle-btn.open {
-  background: rgba(62, 198, 232, 0.16);
-  border-color: rgba(62, 198, 232, 0.6);
-  color: #e2f5fc;
+  background: rgba(0, 210, 255, 0.22);
+  border-color: var(--accent-cyan);
+  color: #ffffff;
 }
 
 .song-meta {
@@ -619,15 +612,6 @@ body {
   overflow: hidden;
   display: flex;
   width: 100%;
-}
-
-.rank-card .metric-stacked-bar {
-  opacity: 0.72;
-  transition: opacity 0.2s ease;
-}
-
-.rank-card:hover .metric-stacked-bar {
-  opacity: 0.94;
 }
 
 .bar-seg {
@@ -661,54 +645,36 @@ body {
 
 .rank-points-col {
   text-align: right;
-  min-width: 180px;
+  min-width: 184px;
   flex-shrink: 0;
 }
 
 .total-points {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  border: 1px solid var(--pt-accent);
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--pt-surface);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
-  transition: border-color 0.2s ease;
-}
-
-.rank-card:hover .total-points {
-  border-color: var(--pt-accent-hover);
-}
-
-.total-points-label {
-  display: block;
-  background: var(--pt-accent);
-  color: var(--pt-on-accent);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.45;
-  padding: 0.14rem 0.55rem;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.total-points-value {
-  display: block;
-  background: var(--pt-surface);
-  color: var(--pt-value);
+  display: inline-block;
   font-size: 1.32rem;
   font-weight: 800;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
-  padding: 0.28rem 0.6rem 0.3rem;
-  text-align: right;
+  color: var(--pt-value);
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.14) 0%, rgba(0, 210, 255, 0.04) 100%);
+  border: 1px solid rgba(0, 210, 255, 0.42);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 2px;
+  padding: 0.24rem 0.65rem;
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.1), inset 0 1px 0 rgba(140, 240, 255, 0.18);
+  text-shadow: 0 0 14px rgba(0, 210, 255, 0.25);
   white-space: nowrap;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.total-points-value small {
+.rank-card:hover .total-points {
+  border-color: rgba(0, 210, 255, 0.65);
+  border-left-color: var(--accent-cyan);
+  box-shadow: 0 0 18px rgba(0, 210, 255, 0.18), inset 0 1px 0 rgba(140, 240, 255, 0.26);
+}
+
+.total-points small {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--pt-unit);
@@ -716,22 +682,12 @@ body {
 }
 
 .points-sub-row {
-  font-size: 0.74rem;
-  color: var(--text-muted);
+  font-size: 0.76rem;
+  color: rgba(148, 163, 184, 0.8);
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
-  margin-top: 0.3rem;
-}
-
-.platform-split-text {
-  font-size: 0.7rem;
-  color: #7888a1;
-}
-
-.points-sub-row .pt-ratio-new {
-  padding: 0.02rem 0.35rem;
-  font-size: 0.68rem;
+  gap: 0.1rem;
+  margin-top: 0.28rem;
 }
 
 /* 詳細パネル */
@@ -824,9 +780,9 @@ body {
 }
 
 .share-song-x-btn {
-  background: rgba(148, 163, 184, 0.08);
-  color: #9eb0c7;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(0, 210, 255, 0.1);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 210, 255, 0.35);
   border-radius: 2px;
   padding: 0.35rem 0.85rem;
   font-size: 0.78rem;
@@ -835,8 +791,7 @@ body {
 }
 
 .share-song-x-btn:hover {
-  background: rgba(62, 198, 232, 0.18);
-  border-color: rgba(62, 198, 232, 0.55);
+  background: rgba(0, 210, 255, 0.22);
   color: #ffffff;
 }
 
@@ -868,7 +823,7 @@ body {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
-  border-left: 4px solid rgba(62, 198, 232, 0.52);
+  border-left: 4px solid var(--accent-cyan);
   padding-left: 0.75rem;
   margin-bottom: 1.25rem;
   line-height: 1.3;
@@ -984,30 +939,21 @@ body {
   background-color: var(--bg-table-row-hover);
 }
 
-#insight-table-container .insight-table thead th {
-  color: #94a3b8;
-}
-
 #insight-table-container .insight-table thead th:nth-child(3) {
-  background-color: var(--pt-accent);
-  color: var(--pt-on-accent);
-  border-color: var(--pt-accent);
-  font-weight: 800;
-  text-align: right;
+  background-color: rgba(0, 210, 255, 0.12);
+  border-bottom: 2px solid var(--accent-cyan);
 }
 
 #insight-table-container .insight-table tbody td.col-total-pt {
-  background-color: var(--pt-surface);
+  background-color: rgba(0, 210, 255, 0.06);
   color: var(--pt-value);
-  border-left: 1px solid rgba(214, 158, 46, 0.7);
-  border-right: 1px solid rgba(214, 158, 46, 0.7);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  border-left: 2px solid rgba(0, 210, 255, 0.45);
 }
 
 #insight-table-container .insight-table tbody tr:hover td.col-total-pt {
-  background-color: var(--pt-surface-hover);
+  background-color: rgba(0, 210, 255, 0.11);
 }
 
 .col-rank {
@@ -1063,9 +1009,9 @@ body {
   padding: 0.1rem 0.45rem;
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--accent-cyan-muted);
-  border: 1px solid rgba(93, 169, 196, 0.32);
-  background: rgba(93, 169, 196, 0.08);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  background: rgba(0, 210, 255, 0.1);
   border-radius: 2px;
 }
 
@@ -2034,13 +1980,12 @@ body {
 }
 
 .commentary-rank-badge {
-  background: #1e293b;
-  color: var(--text-primary);
-  border: 1px solid #3b4f73;
+  background: var(--accent-cyan);
+  color: #0f172a;
   font-weight: 800;
   font-size: 0.8rem;
   padding: 0.15rem 0.55rem;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .commentary-song-title {
@@ -2054,9 +1999,10 @@ body {
 }
 
 .commentary-song-pt {
-  background: var(--pt-surface);
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.12) 0%, rgba(0, 210, 255, 0.04) 100%);
   color: var(--pt-value);
-  border: 1px solid var(--pt-accent);
+  border: 1px solid rgba(0, 210, 255, 0.38);
+  border-left: 3px solid var(--accent-cyan);
   border-radius: 2px;
   padding: 0.12rem 0.55rem;
   font-weight: 800;
@@ -2267,42 +2213,23 @@ body {
   .rank-points-col {
     grid-area: points;
     min-width: 0;
-    max-width: 100%;
     text-align: right;
     justify-self: end;
   }
 
   .total-points {
-    display: inline-flex;
-    flex-direction: column;
-    width: auto;
-    min-width: 126px;
-  }
-
-  .total-points-label {
-    font-size: 0.6rem;
-    padding: 0.1rem 0.4rem;
-    letter-spacing: 0.04em;
-    line-height: 1.35;
-  }
-
-  .total-points-value {
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     line-height: 1.2;
-    padding: 0.18rem 0.45rem 0.2rem;
+    padding: 0.18rem 0.48rem;
   }
 
-  .total-points-value small {
-    font-size: 0.68rem;
+  .total-points small {
+    font-size: 0.7rem;
   }
 
   .points-sub-row {
-    font-size: 0.66rem;
-    margin-top: 0.2rem;
-  }
-
-  .platform-split-text {
-    font-size: 0.64rem;
+    font-size: 0.68rem;
+    margin-top: 0.18rem;
   }
 
   .rank-info-col {
