@@ -21,6 +21,15 @@
   --up-green: #4ade80;
   --down-red: #f87171;
   --stay-gray: #94a3b8;
+
+  /* ポイント表示専用アクセント（シャンパンゴールド系） */
+  --point-gold: #f5d378;
+  --point-gold-unit: #cbb67c;
+  --point-gold-border: rgba(245, 211, 120, 0.36);
+  --point-gold-accent: rgba(245, 211, 120, 0.85);
+  --point-gold-bg-top: rgba(245, 211, 120, 0.11);
+  --point-gold-bg-bottom: rgba(245, 211, 120, 0.03);
+  --point-gold-glow: rgba(245, 211, 120, 0.18);
 }
 
 * {
@@ -645,14 +654,33 @@ body {
 }
 
 .total-points {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.24em;
+  min-width: 100%;
+  padding: 0.26rem 0.65rem 0.26rem 0.72rem;
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--text-primary);
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--point-gold);
+  background: linear-gradient(180deg, var(--point-gold-bg-top) 0%, var(--point-gold-bg-bottom) 100%);
+  border: 1px solid var(--point-gold-border);
+  border-left: 3px solid var(--point-gold-accent);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.06), 0 2px 10px rgba(0, 0, 0, 0.22);
+  text-shadow: 0 0 12px var(--point-gold-glow);
+  white-space: nowrap;
 }
 
 .total-points small {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--point-gold-unit);
+  text-shadow: none;
 }
 
 .points-sub-row {
@@ -661,7 +689,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  margin-top: 0.2rem;
+  margin-top: 0.3rem;
 }
 
 /* 詳細パネル */
@@ -936,7 +964,8 @@ body {
 
 .col-total-pt {
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--point-gold);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -2168,17 +2197,20 @@ body {
   }
 
   .total-points {
-    font-size: 1.12rem;
+    min-width: 0;
+    padding: 0.18rem 0.48rem 0.18rem 0.52rem;
+    font-size: 1.06rem;
     line-height: 1.2;
+    border-left-width: 2px;
   }
 
   .total-points small {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
   }
 
   .points-sub-row {
     font-size: 0.7rem;
-    margin-top: 0.1rem;
+    margin-top: 0.22rem;
   }
 
   .rank-info-col {
