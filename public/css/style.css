@@ -150,10 +150,13 @@ body {
 .archive-box {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 2px;
   padding: 0.5rem 0.9rem;
   display: flex;
   flex-direction: column;
+}
+
+.period-box {
+  border-radius: 2px;
 }
 
 .period-label,
@@ -357,7 +360,6 @@ body {
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 2px;
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
   font-weight: 700;
@@ -427,7 +429,6 @@ body {
   background: #0f172a;
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 2px;
   padding: 0.45rem 0.7rem;
   font-size: 0.84rem;
   font-weight: 600;
@@ -439,7 +440,6 @@ body {
   background: #0f172a;
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 2px;
   padding: 0.45rem 0.75rem;
   font-size: 0.84rem;
   font-weight: 700;
@@ -567,7 +567,6 @@ body {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 2px;
   padding: 0.1rem 0.45rem;
   font-size: 0.82rem;
   cursor: pointer;
@@ -585,7 +584,6 @@ body {
   background: rgba(0, 210, 255, 0.1);
   color: var(--accent-cyan);
   border: 1px solid rgba(0, 210, 255, 0.35);
-  border-radius: 2px;
   padding: 0.15rem 0.6rem;
   font-size: 0.75rem;
   font-weight: 700;
@@ -780,7 +778,6 @@ body {
   font-weight: 700;
   text-decoration: none;
   padding: 0.4rem 0.8rem;
-  border-radius: 2px;
 }
 
 .yt-link {
