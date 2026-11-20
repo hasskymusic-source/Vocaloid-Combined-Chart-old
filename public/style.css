@@ -683,6 +683,18 @@ body {
   text-shadow: none;
 }
 
+@media (min-width: 641px) and (hover: hover) and (pointer: fine) {
+  .total-points {
+    padding: 0.13rem 0.65rem 0.32rem 0.72rem;
+    font-size: 1.6rem;
+    line-height: 1.02;
+  }
+
+  .total-points small {
+    font-size: 0.88rem;
+  }
+}
+
 .points-sub-row {
   font-size: 0.78rem;
   color: var(--text-secondary);
