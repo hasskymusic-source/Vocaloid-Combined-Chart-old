@@ -684,9 +684,12 @@ body {
 }
 
 @media (min-width: 641px) and (hover: hover) and (pointer: fine) {
-  .rank-number,
-  .song-title {
+  .rank-number {
     font-size: 1.6rem;
+  }
+
+  .song-title {
+    font-size: 1.34rem;
   }
 
   .total-points {
